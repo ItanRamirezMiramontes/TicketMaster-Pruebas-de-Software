@@ -1,12 +1,12 @@
-﻿import { useState, useEffect } from "react";
-import { Film, Calendar, Loader } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Music, Calendar, Loader } from "lucide-react";
 import api from "../api/axios";
 import useForm from "../hooks/useForm";
 import { useAuth } from "../context/AuthContext";
 
 const METODOS = ["CREDITO", "DEBITO", "PAYPAL"];
 
-const Cine = () => {
+const Musica = () => {
   const { user } = useAuth();
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -28,16 +28,19 @@ const Cine = () => {
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        const response = await api.get("/events/cine");
+        const response = await api.get("/events/musica");
         setEvents(response.data);
       } catch (err) {
-        setError("Error al cargar eventos de cine");
+        setError("Error al cargar conciertos disponibles.");
       } finally {
         setLoading(false);
       }
     };
+
     loadEvents();
   }, []);
+
+  const selectedEvent = events.find((event) => event.id === values.event_id);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -46,12 +49,12 @@ const Cine = () => {
     setReservation(null);
 
     if (!user) {
-      setError("Necesitas iniciar sesión para reservar entradas de cine.");
+      setError("Necesitas iniciar sesión para reservar conciertos.");
       return;
     }
 
     if (!values.event_id) {
-      setError("Selecciona un evento.");
+      setError("Selecciona un concierto.");
       return;
     }
 
@@ -80,7 +83,7 @@ const Cine = () => {
         },
       };
 
-      const response = await api.post("/tickets/cine", payload);
+      const response = await api.post("/tickets/musica", payload);
       setMessage(response.data.mensaje);
       setReservation(response.data);
     } catch (err) {
@@ -88,18 +91,16 @@ const Cine = () => {
     }
   };
 
-  const selectedEvent = events.find((e) => e.id === values.event_id);
-
   return (
     <section className="space-y-6">
       <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-xl shadow-slate-950/40">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.4em] text-indigo-400">Cine</p>
-            <h2 className="mt-3 text-3xl font-semibold text-slate-100">Reserva tus entradas</h2>
-            <p className="mt-2 text-slate-400">Elige una película disponible. Confirmación segura en minutos.</p>
+            <p className="text-sm uppercase tracking-[0.4em] text-indigo-400">Música</p>
+            <h2 className="mt-3 text-3xl font-semibold text-slate-100">Reserva tu concierto</h2>
+            <p className="mt-2 text-slate-400">Compra entradas para conciertos y festivales disponibles.</p>
           </div>
-          <Film className="h-12 w-12 text-indigo-400" />
+          <Music className="h-12 w-12 text-indigo-400" />
         </div>
       </div>
 
@@ -112,20 +113,20 @@ const Cine = () => {
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader className="h-8 w-8 animate-spin text-indigo-400" />
-          <span className="ml-3 text-slate-400">Cargando eventos...</span>
+          <span className="ml-3 text-slate-400">Cargando conciertos...</span>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-6 rounded-3xl border border-slate-800 bg-slate-900/90 p-8">
             <label className="block text-sm text-slate-300">
-              Evento
+              Concierto
               <select
                 name="event_id"
                 value={values.event_id}
                 onChange={handleChange}
                 className="mt-2 w-full rounded-2xl border-slate-800 bg-slate-950 px-4 py-3 text-slate-100"
               >
-                <option value="">Selecciona una película</option>
+                <option value="">Selecciona un concierto</option>
                 {events.map((event) => (
                   <option key={event.id} value={event.id}>
                     {event.name} - {event.venue_name} ({event.city})
@@ -141,7 +142,7 @@ const Cine = () => {
                   name="boletos"
                   type="number"
                   min={1}
-                  max={10}
+                  max={12}
                   value={values.boletos}
                   onChange={handleChange}
                   className="mt-2 w-full rounded-2xl border-slate-800 bg-slate-950 px-4 py-3 text-slate-100"
@@ -175,7 +176,9 @@ const Cine = () => {
                     className="mt-2 w-full rounded-2xl border-slate-800 bg-slate-950 px-4 py-3 text-slate-100"
                   >
                     {METODOS.map((item) => (
-                      <option key={item} value={item}>{item}</option>
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -218,8 +221,8 @@ const Cine = () => {
               <p className="text-sm uppercase tracking-[0.3em] text-indigo-400">Resumen</p>
               {selectedEvent && (
                 <>
-                  <p className="mt-4 text-slate-300">Película: {selectedEvent.name}</p>
-                  <p className="text-slate-300">Cine: {selectedEvent.venue_name}</p>
+                  <p className="mt-4 text-slate-300">Concierto: {selectedEvent.name}</p>
+                  <p className="text-slate-300">Lugar: {selectedEvent.venue_name}</p>
                   <p className="text-slate-300">Ciudad: {selectedEvent.city}</p>
                 </>
               )}
@@ -229,7 +232,7 @@ const Cine = () => {
 
             <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5">
               <p className="mb-3 text-sm uppercase tracking-[0.3em] text-indigo-400">Restricciones</p>
-              <p className="text-slate-300">Máximo 10 boletos por usuario. Prohibido ingresar mascotas, armas y alimentos externos.</p>
+              <p className="text-slate-300">Máximo 12 boletos por compra. No se permite ingresar bebidas ni armas.</p>
             </div>
 
             {message && (
@@ -256,4 +259,4 @@ const Cine = () => {
   );
 };
 
-export default Cine;
+export default Musica;

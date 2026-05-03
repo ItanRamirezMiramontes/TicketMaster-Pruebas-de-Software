@@ -1,9 +1,31 @@
 from __future__ import annotations
 
 import abc
+import re
 from datetime import date, datetime
 from typing import ClassVar, Dict, Optional, List, Any
 from pydantic import BaseModel
+
+VENUE_CAPACIDAD_MAP: Dict[str, int] = {
+    "scala": 2000,
+    "imax": 400,
+    "met": 2200,
+    "royal": 1800,
+    "palace": 1600,
+    "teatro": 1500,
+    "auditorium": 1200,
+}
+
+MUSEO_CAPACIDAD_MAP: Dict[str, int] = {
+    "louvre": 2500,
+    "vaticano": 1800,
+    "met": 2200,
+    "antroplogía": 1200,
+    "mnac": 900,
+    "museo": 1000,
+}
+
+MUSEO_OCUPACION: Dict[str, int] = {}
 
 
 class TicketmasterEvent(BaseModel):
@@ -32,13 +54,13 @@ class TicketmasterEvent(BaseModel):
     @property
     def venue_name(self) -> Optional[str]:
         if self._embedded and "venues" in self._embedded:
-            return self._embedded["venues"][0]["name"]
+            return self._embedded["venues"][0].get("name")
         return None
 
     @property
     def city(self) -> Optional[str]:
         if self._embedded and "venues" in self._embedded:
-            return self._embedded["venues"][0]["city"]["name"]
+            return self._embedded["venues"][0].get("city", {}).get("name")
         return None
 
     @property
@@ -90,7 +112,7 @@ class Evento(abc.ABC):
 
     def validar_fecha(self) -> None:
         if self.es_dia_no_laboral(self.fecha):
-            raise ValueError("La compra está bloqueada en días festivos.")
+            raise ValueError("Día No Laboral")
 
     @abc.abstractmethod
     def validar_compra(self) -> None:
@@ -109,11 +131,23 @@ class Teatro(Evento):
         self.event_id = event_id
         self.event_data = event_data
 
+    def get_venue_capacity(self) -> int:
+        if self.event_data and self.event_data.venue_name:
+            name = self.event_data.venue_name.lower()
+            for key, cap in VENUE_CAPACIDAD_MAP.items():
+                if key in name:
+                    return cap
+        return 1000
+
     def validar_compra(self) -> None:
         self.validar_fecha()
 
         if not (1 <= self.boletos <= self.MAX_BOLETOS):
             raise ValueError(f"Máximo {self.MAX_BOLETOS} boletos por usuario para teatro.")
+
+        capacidad = self.get_venue_capacity()
+        if self.boletos > capacidad:
+            raise ValueError(f"La cantidad de boletos excede la capacidad del venue ({capacidad}).")
 
     def calcular_total(self) -> float:
         if self.event_data and self.event_data.min_price:
@@ -129,16 +163,37 @@ class Cine(Evento):
         self.event_id = event_id
         self.event_data = event_data
 
+    def get_venue_capacity(self) -> int:
+        if self.event_data and self.event_data.venue_name:
+            name = self.event_data.venue_name.lower()
+            for key, cap in VENUE_CAPACIDAD_MAP.items():
+                if key in name:
+                    return cap
+        return 1000
+
     def validar_compra(self) -> None:
         self.validar_fecha()
 
         if not (1 <= self.boletos <= self.MAX_BOLETOS):
             raise ValueError(f"Máximo {self.MAX_BOLETOS} boletos por compra para cine.")
 
+        capacidad = self.get_venue_capacity()
+        if self.boletos > capacidad:
+            raise ValueError(f"La cantidad de boletos excede la capacidad del venue ({capacidad}).")
+
     def calcular_total(self) -> float:
         if self.event_data and self.event_data.min_price:
             return float(self.event_data.min_price * self.boletos)
         return 650.0 * self.boletos  # Precio por defecto
+
+
+class Concierto(Cine):
+    MAX_BOLETOS: ClassVar[int] = 12
+
+    def calcular_total(self) -> float:
+        if self.event_data and self.event_data.min_price:
+            return float(self.event_data.min_price * self.boletos)
+        return 700.0 * self.boletos
 
 
 class Museo(Evento):
@@ -149,11 +204,26 @@ class Museo(Evento):
         self.venue_id = venue_id
         self.venue_data = venue_data
 
+    def get_capacity(self) -> int:
+        if self.venue_data and self.venue_data.name:
+            name = self.venue_data.name.lower()
+            for key, cap in MUSEO_CAPACIDAD_MAP.items():
+                if key in name:
+                    return cap
+        return 500
+
     def validar_compra(self) -> None:
         self.validar_fecha()
 
         if not (1 <= self.boletos <= self.MAX_BOLETOS):
             raise ValueError(f"Máximo {self.MAX_BOLETOS} boletos por usuario para museo.")
+
+        capacidad = self.get_capacity()
+        ocupados = MUSEO_OCUPACION.get(self.venue_id, 0)
+        if ocupados + self.boletos > capacidad:
+            raise ValueError(
+                f"Capacidad máxima de {capacidad} boletos para este museo. Ya hay {ocupados} boletos reservados.",
+            )
 
     def calcular_total(self) -> float:
         return 220.0 * self.boletos  # Precio fijo para museos
@@ -161,8 +231,8 @@ class Museo(Evento):
 
 class Pago:
     METODOS_VALIDOS: ClassVar[set[str]] = {"CREDITO", "DEBITO", "PAYPAL"}
-    TARJETA_PATTERN = re.compile(r'^\d+$')
-    NOMBRE_PATTERN = re.compile(r'^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+$')
+    TARJETA_PATTERN = re.compile(r"^\d+$")
+    NOMBRE_PATTERN = re.compile(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+$")
 
     @staticmethod
     def procesar_pago(metodo: str, nombre_tarjeta: Optional[str], numero_tarjeta: Optional[str]) -> None:
@@ -175,7 +245,7 @@ class Pago:
             return
 
         if not nombre_tarjeta or not Pago.NOMBRE_PATTERN.fullmatch(nombre_tarjeta.strip()):
-            raise ValueError("El nombre del titular debe contener solo texto y espacios.")
+            raise ValueError("El nombre del titular debe contener solo letras y espacios.")
 
         if not numero_tarjeta or not Pago.TARJETA_PATTERN.fullmatch(numero_tarjeta.strip()):
             raise ValueError("El número de tarjeta debe contener solo dígitos.")

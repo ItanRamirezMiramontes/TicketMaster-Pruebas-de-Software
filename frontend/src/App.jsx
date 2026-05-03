@@ -5,10 +5,11 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Teatro from "./pages/Teatro";
 import Cine from "./pages/Cine";
+import Musica from "./pages/Musica";
 import Museo from "./pages/Museo";
 import { useAuth } from "./context/AuthContext";
 
-const TABS = ["Inicio", "Teatro", "Cine", "Museo"];
+const TABS = ["Inicio", "Teatro", "Cine", "Musica", "Museo"];
 
 function App() {
   const [activeTab, setActiveTab] = useState("Inicio");
@@ -31,6 +32,8 @@ function App() {
         return <Teatro />;
       case "Cine":
         return <Cine />;
+      case "Musica":
+        return <Musica />;
       case "Museo":
         return <Museo />;
       default:

@@ -1,10 +1,11 @@
-import { Home, Theater, Film, BookOpen, LogOut } from "lucide-react";
+import { Home, Theater, Film, Music, BookOpen, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 const ICONS = {
   Inicio: Home,
   Teatro: Theater,
   Cine: Film,
+  Musica: Music,
   Museo: BookOpen,
 };
 
@@ -37,21 +38,19 @@ const Navbar = ({ activeTab, setActiveTab, tabs, setAuthMode }) => {
         </div>
 
         <div className="flex items-center gap-4 text-sm text-slate-300">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
+            <p className="font-semibold text-slate-100">Estudiante: Itan Ramírez</p>
+            <p>Código: 12345678</p>
+          </div>
           {user ? (
-            <>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
-                <p className="font-semibold text-slate-100">Estudiante: [Tu Nombre]</p>
-                <p>Código: [Tu Código]</p>
-              </div>
-              <button
-                onClick={logout}
-                className="inline-flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-slate-200 transition hover:bg-slate-700"
-                type="button"
-              >
-                <LogOut className="h-4 w-4" />
-                Salir
-              </button>
-            </>
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-slate-200 transition hover:bg-slate-700"
+              type="button"
+            >
+              <LogOut className="h-4 w-4" />
+              Salir
+            </button>
           ) : (
             <div className="flex items-center gap-2">
               <button

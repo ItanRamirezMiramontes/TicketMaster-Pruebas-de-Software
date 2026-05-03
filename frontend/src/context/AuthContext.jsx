@@ -8,7 +8,7 @@ const AuthContext = createContext({
   logout: () => {},
 });
 
-const USUARIO_PATTERN = /^[A-Z]{20}$/;
+const USUARIO_PATTERN = /^[A-Za-z0-9]{5,20}$/;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
 
     if (!USUARIO_PATTERN.test(usuario)) {
-      setError("El usuario debe tener exactamente 20 caracteres en MAYÚSCULAS.");
+      setError("El usuario debe tener entre 5 y 20 caracteres alfanuméricos.");
       return false;
     }
 

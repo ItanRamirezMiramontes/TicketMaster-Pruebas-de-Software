@@ -1,0 +1,1 @@
+[{"id":"CINE1","name":"Estreno Blockbuster","url":"https://ticketmaster.example/estreno-blockbuster","dates":{"start":{"dateTime":"2026-06-17T18:00:00Z"}},"classifications":[{"segment":{"name":"Film"}}],"images":[{"url":"https://placehold.co/600x400?text=Movie+Premiere"}],"priceRanges":[{"min":90.0,"max":150.0}],"promoter":null,"info":null,"pleaseNote":null,"products":null}]

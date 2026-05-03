@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Ticket, CreditCard, Calendar, Loader } from "lucide-react";
+import { Ticket, Calendar, Loader } from "lucide-react";
 import api from "../api/axios";
 import useForm from "../hooks/useForm";
 import { useAuth } from "../context/AuthContext";
@@ -36,6 +36,7 @@ const Teatro = () => {
         setLoading(false);
       }
     };
+
     loadEvents();
   }, []);
 
@@ -43,6 +44,7 @@ const Teatro = () => {
     event.preventDefault();
     setError(null);
     setMessage(null);
+    setReservation(null);
 
     if (!user) {
       setError("Necesitas autenticación para continuar.");
@@ -59,8 +61,8 @@ const Teatro = () => {
         setError("El número de tarjeta solo puede contener dígitos.");
         return;
       }
-      if (!/^[A-Za-z ]+$/.test(values.nombre_tarjeta.trim())) {
-        setError("El nombre de la tarjeta solo puede contener letras.");
+      if (!/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+$/.test(values.nombre_tarjeta.trim())) {
+        setError("El nombre del titular solo puede contener letras y espacios.");
         return;
       }
     }
@@ -87,7 +89,7 @@ const Teatro = () => {
     }
   };
 
-  const selectedEvent = events.find(e => e.id === values.event_id);
+  const selectedEvent = events.find((e) => e.id === values.event_id);
 
   return (
     <section className="space-y-6">
@@ -174,7 +176,9 @@ const Teatro = () => {
                     className="mt-2 w-full rounded-2xl border-slate-800 bg-slate-950 px-4 py-3 text-slate-100"
                   >
                     {METODOS.map((item) => (
-                      <option key={item} value={item}>{item}</option>
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -228,27 +232,29 @@ const Teatro = () => {
 
             <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5">
               <p className="mb-3 text-sm uppercase tracking-[0.3em] text-indigo-400">Restricciones</p>
-              <p className="text-slate-300">Máximo 10 boletos por usuario. No se aceptan cambios el día festivo.</p>
+              <p className="text-slate-300">Máximo 10 boletos por usuario. No se aceptan cambios el día festivo. No se permite ingresar alimentos ni armas.</p>
             </div>
 
             {message && (
               <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-emerald-200">
                 <p className="font-semibold">{message}</p>
                 <p className="mt-2 text-slate-300">Total estimado calculado por el backend.</p>
-            </div>
-          )}
+              </div>
+            )}
 
-          {reservation && (
-            <div className="rounded-3xl border border-indigo-600 bg-slate-950/90 p-5">
-              <p className="text-sm uppercase tracking-[0.3em] text-indigo-400">Ficha de Reservación</p>
-              <p className="mt-3 text-slate-100">ID: {reservation.purchase_id}</p>
-              <p className="text-slate-300">Total: ${reservation.total.toFixed(2)}</p>
-              <p className="text-slate-300">Boletos: {values.boletos}</p>
-              <p className="mt-3 text-slate-300">{reservation.detalles?.restricciones || "Sin detalles adicionales."}</p>
-            </div>
-          )}
-        </aside>
-      </form>
+            {reservation && (
+              <div className="rounded-3xl border border-indigo-600 bg-slate-950/90 p-5">
+                <p className="text-sm uppercase tracking-[0.3em] text-indigo-400">Ficha de Reservación</p>
+                <p className="mt-3 text-slate-100">ID: {reservation.purchase_id}</p>
+                <p className="text-slate-300">Total: ${reservation.total.toFixed(2)}</p>
+                <p className="text-slate-300">Boletos: {reservation.detalles?.boletos}</p>
+                <p className="text-slate-300">Horario: {reservation.detalles?.horario_entrada}</p>
+                <p className="mt-3 text-slate-300">{reservation.detalles?.restricciones}</p>
+              </div>
+            )}
+          </aside>
+        </form>
+      )}
     </section>
   );
 };

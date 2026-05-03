@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import date
 from enum import Enum
 from typing import Any, Dict, Optional
@@ -23,6 +24,8 @@ class PaymentInfo(BaseModel):
         if self.metodo in {PaymentMethod.CREDITO, PaymentMethod.DEBITO}:
             if not self.nombre_tarjeta or not self.nombre_tarjeta.strip():
                 raise ValueError("El nombre del titular es obligatorio para pago con tarjeta.")
+            if not re.fullmatch(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+$", self.nombre_tarjeta.strip()):
+                raise ValueError("El nombre del titular debe contener solo letras y espacios.")
             if not self.numero_tarjeta or not self.numero_tarjeta.isdigit():
                 raise ValueError("El número de tarjeta debe ser numérico para pago con tarjeta.")
 
@@ -63,6 +66,11 @@ class TeatroTicketRequest(BaseTicketRequest):
 
 
 class CineTicketRequest(BaseTicketRequest):
+    event_id: str
+    boletos: int = Field(..., ge=1)
+
+
+class MusicaTicketRequest(BaseTicketRequest):
     event_id: str
     boletos: int = Field(..., ge=1)
 

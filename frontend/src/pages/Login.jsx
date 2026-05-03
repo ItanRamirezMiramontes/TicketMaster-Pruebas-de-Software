@@ -3,7 +3,7 @@ import { User, Lock, ArrowRight } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useForm from "../hooks/useForm";
 
-const USUARIO_PATTERN = /^[A-Z]{20}$/;
+const USUARIO_PATTERN = /^[A-Za-z0-9]{5,20}$/;
 
 const Login = ({ setAuthMode }) => {
   const { login, error: authError } = useAuth();
@@ -16,7 +16,7 @@ const Login = ({ setAuthMode }) => {
     setLocalError(null);
 
     if (!USUARIO_PATTERN.test(values.usuario)) {
-      setLocalError("El usuario debe tener exactamente 20 caracteres en MAYÚSCULAS.");
+      setLocalError("El usuario debe tener entre 5 y 20 caracteres alfanuméricos.");
       return;
     }
 
@@ -53,7 +53,7 @@ const Login = ({ setAuthMode }) => {
                 name="usuario"
                 value={values.usuario}
                 onChange={handleChange}
-                placeholder="ABCD123456EFPQRS12Z"
+                placeholder="usuario12345"
                 className="w-full bg-transparent text-slate-100 placeholder:text-slate-500"
                 maxLength={20}
               />
