@@ -58,21 +58,17 @@ class LoginRequest(BaseModel):
 
 
 class TeatroTicketRequest(BaseTicketRequest):
-    sede: str
-    obra: str
-    seccion: str
+    event_id: str
     boletos: int = Field(..., ge=1)
 
 
 class CineTicketRequest(BaseTicketRequest):
-    establecimiento: str
-    tipo_servicio: str
-    clasificacion: str
+    event_id: str
     boletos: int = Field(..., ge=1)
 
 
 class MuseoTicketRequest(BaseTicketRequest):
-    sede: str
+    venue_id: str
     boletos: int = Field(..., ge=1)
 
 

@@ -1,9 +1,74 @@
 from __future__ import annotations
 
 import abc
-import re
-from datetime import date
-from typing import ClassVar, Dict, Optional
+from datetime import date, datetime
+from typing import ClassVar, Dict, Optional, List, Any
+from pydantic import BaseModel
+
+
+class TicketmasterEvent(BaseModel):
+    """Modelo para eventos de la API de Ticketmaster"""
+    id: str
+    name: str
+    url: str
+    dates: Dict[str, Any]
+    classifications: List[Dict[str, Any]]
+    _embedded: Optional[Dict[str, Any]] = None
+    images: List[Dict[str, Any]]
+    priceRanges: Optional[List[Dict[str, Any]]] = None
+    promoter: Optional[Dict[str, Any]] = None
+    info: Optional[str] = None
+    pleaseNote: Optional[str] = None
+    products: Optional[List[Dict[str, Any]]] = None
+
+    @property
+    def start_date(self) -> Optional[datetime]:
+        if self.dates and "start" in self.dates:
+            date_str = self.dates["start"].get("dateTime")
+            if date_str:
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        return None
+
+    @property
+    def venue_name(self) -> Optional[str]:
+        if self._embedded and "venues" in self._embedded:
+            return self._embedded["venues"][0]["name"]
+        return None
+
+    @property
+    def city(self) -> Optional[str]:
+        if self._embedded and "venues" in self._embedded:
+            return self._embedded["venues"][0]["city"]["name"]
+        return None
+
+    @property
+    def min_price(self) -> Optional[float]:
+        if self.priceRanges:
+            return self.priceRanges[0].get("min")
+        return None
+
+    @property
+    def max_price(self) -> Optional[float]:
+        if self.priceRanges:
+            return self.priceRanges[0].get("max")
+        return None
+
+
+class TicketmasterVenue(BaseModel):
+    """Modelo para venues de la API de Ticketmaster"""
+    id: str
+    name: str
+    type: str
+    url: str
+    locale: str
+    timezone: str
+    city: Dict[str, str]
+    state: Optional[Dict[str, str]] = None
+    country: Dict[str, str]
+    address: Optional[Dict[str, str]] = None
+    location: Optional[Dict[str, str]] = None
+    markets: Optional[List[Dict[str, Any]]] = None
+    dmas: Optional[List[Dict[str, Any]]] = None
 
 
 class Evento(abc.ABC):
@@ -37,117 +102,61 @@ class Evento(abc.ABC):
 
 
 class Teatro(Evento):
-    SEDES: ClassVar[Dict[str, list[str]]] = {
-        "COLÓN": ["El Fantasma", "El Sueño", "La Dama"] ,
-        "SCALA": ["Historia Viva", "La Orquesta", "El Sueño"],
-        "METROPÓLITAN": ["El Viaje", "Memorias", "El Duelo"],
-    }
-    SECCIONES_PRECIOS: ClassVar[Dict[str, int]] = {
-        "LUNETA": 500,
-        "PALCO": 800,
-        "PREFERENTE": 300,
-    }
     MAX_BOLETOS: ClassVar[int] = 10
 
-    def __init__(self, sede: str, obra: str, seccion: str, boletos: int, fecha: date):
+    def __init__(self, event_id: str, boletos: int, fecha: date, event_data: TicketmasterEvent = None):
         super().__init__(fecha=fecha, boletos=boletos)
-        self.sede = sede.strip().upper()
-        self.obra = obra.strip()
-        self.seccion = seccion.strip().upper()
+        self.event_id = event_id
+        self.event_data = event_data
 
     def validar_compra(self) -> None:
         self.validar_fecha()
-
-        if self.sede not in self.SEDES:
-            raise ValueError(f"Sede de teatro inválida: {self.sede}.")
-
-        if self.obra not in self.SEDES[self.sede]:
-            raise ValueError(f"Obra inválida para {self.sede}: {self.obra}.")
-
-        if self.seccion not in self.SECCIONES_PRECIOS:
-            raise ValueError(f"Sección inválida: {self.seccion}.")
 
         if not (1 <= self.boletos <= self.MAX_BOLETOS):
             raise ValueError(f"Máximo {self.MAX_BOLETOS} boletos por usuario para teatro.")
 
     def calcular_total(self) -> float:
-        precio_unitario = self.SECCIONES_PRECIOS[self.seccion]
-        return float(precio_unitario * self.boletos)
+        if self.event_data and self.event_data.min_price:
+            return float(self.event_data.min_price * self.boletos)
+        return 500.0 * self.boletos  # Precio por defecto
 
 
 class Cine(Evento):
-    ESTABLECIMIENTOS: ClassVar[list[str]] = ["CINEMEX", "CINEMARK", "OXFORD", "CINESA"]
-    SERVICIOS: ClassVar[Dict[str, int]] = {
-        "VIP": 650,
-        "IMAX": 780,
-        "4DX": 920,
-    }
-    CLASIFICACIONES: ClassVar[list[str]] = ["AA", "A", "B", "B15", "C", "D"]
-    RESTRICCIONES: ClassVar[str] = "Prohibido ingresar mascotas, armas y alimentos externos."
     MAX_BOLETOS: ClassVar[int] = 10
 
-    def __init__(self, establecimiento: str, tipo_servicio: str, clasificacion: str, boletos: int, fecha: date):
+    def __init__(self, event_id: str, boletos: int, fecha: date, event_data: TicketmasterEvent = None):
         super().__init__(fecha=fecha, boletos=boletos)
-        self.establecimiento = establecimiento.strip().upper()
-        self.tipo_servicio = tipo_servicio.strip().upper()
-        self.clasificacion = clasificacion.strip().upper()
+        self.event_id = event_id
+        self.event_data = event_data
 
     def validar_compra(self) -> None:
         self.validar_fecha()
-
-        if self.establecimiento not in self.ESTABLECIMIENTOS:
-            raise ValueError(f"Establecimiento de cine inválido: {self.establecimiento}.")
-
-        if self.tipo_servicio not in self.SERVICIOS:
-            raise ValueError(f"Tipo de servicio inválido para cine: {self.tipo_servicio}.")
-
-        if self.clasificacion not in self.CLASIFICACIONES:
-            raise ValueError(f"Clasificación de película inválida: {self.clasificacion}.")
 
         if not (1 <= self.boletos <= self.MAX_BOLETOS):
             raise ValueError(f"Máximo {self.MAX_BOLETOS} boletos por compra para cine.")
 
     def calcular_total(self) -> float:
-        precio_unitario = self.SERVICIOS[self.tipo_servicio]
-        return float(precio_unitario * self.boletos)
-
-    def obtener_restricciones(self) -> str:
-        return self.RESTRICCIONES
+        if self.event_data and self.event_data.min_price:
+            return float(self.event_data.min_price * self.boletos)
+        return 650.0 * self.boletos  # Precio por defecto
 
 
 class Museo(Evento):
-    CAPACIDADES: ClassVar[Dict[str, int]] = {
-        "LOUVRE": 500,
-        "VATICANO": 400,
-        "MET": 450,
-        "ANTROPOLOGÍA": 300,
-        "MNAC": 250,
-    }
     MAX_BOLETOS: ClassVar[int] = 5
-    PRECIO_BOLETO: ClassVar[float] = 220.0
 
-    def __init__(self, sede: str, boletos: int, fecha: date, ocupacion_actual: int = 0):
+    def __init__(self, venue_id: str, boletos: int, fecha: date, venue_data: TicketmasterVenue = None):
         super().__init__(fecha=fecha, boletos=boletos)
-        self.sede = sede.strip().upper()
-        self.ocupacion_actual = ocupacion_actual
+        self.venue_id = venue_id
+        self.venue_data = venue_data
 
     def validar_compra(self) -> None:
         self.validar_fecha()
 
-        if self.sede not in self.CAPACIDADES:
-            raise ValueError(f"Sede de museo inválida: {self.sede}.")
-
         if not (1 <= self.boletos <= self.MAX_BOLETOS):
             raise ValueError(f"Máximo {self.MAX_BOLETOS} boletos por usuario para museo.")
 
-        capacidad_total = self.CAPACIDADES[self.sede]
-        if self.ocupacion_actual + self.boletos > capacidad_total:
-            raise ValueError(
-                f"Capacidad excedida en {self.sede}. Quedan {capacidad_total - self.ocupacion_actual} lugares disponibles."
-            )
-
     def calcular_total(self) -> float:
-        return float(self.PRECIO_BOLETO * self.boletos)
+        return 220.0 * self.boletos  # Precio fijo para museos
 
 
 class Pago:

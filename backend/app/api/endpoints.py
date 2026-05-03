@@ -1,11 +1,13 @@
 from datetime import date
 from enum import Enum
 from uuid import uuid4
+from typing import List
 
 from fastapi import APIRouter, HTTPException
 
 from app.core.security import Security
-from app.models.events import Cine, Museo, Pago, Teatro
+from app.core.ticketmaster_api import ticketmaster_api
+from app.models.events import Cine, Museo, Pago, Teatro, TicketmasterEvent, TicketmasterVenue
 from app.schemas.ticket import (
     CineTicketRequest,
     LoginRequest,
@@ -61,16 +63,55 @@ def login(request: LoginRequest) -> dict[str, str]:
     return {"message": "Login exitoso."}
 
 
+@router.get("/events/teatro")
+async def get_teatro_events(city: str = None, size: int = 20) -> List[TicketmasterEvent]:
+    """Obtener eventos de teatro desde Ticketmaster API"""
+    try:
+        data = await ticketmaster_api.search_events(classification_name="Arts & Theatre", city=city, size=size)
+        events = [TicketmasterEvent(**event) for event in data.get("_embedded", {}).get("events", [])]
+        return events
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener eventos de teatro: {str(e)}")
+
+
+@router.get("/events/cine")
+async def get_cine_events(city: str = None, size: int = 20) -> List[TicketmasterEvent]:
+    """Obtener eventos de cine desde Ticketmaster API"""
+    try:
+        data = await ticketmaster_api.search_events(classification_name="Film", city=city, size=size)
+        events = [TicketmasterEvent(**event) for event in data.get("_embedded", {}).get("events", [])]
+        return events
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener eventos de cine: {str(e)}")
+
+
+@router.get("/venues/museo")
+async def get_museo_venues(city: str = None, size: int = 20) -> List[TicketmasterVenue]:
+    """Obtener venues de museo desde Ticketmaster API"""
+    try:
+        data = await ticketmaster_api.get_venues(city=city, size=size)
+        venues = [TicketmasterVenue(**venue) for venue in data.get("_embedded", {}).get("venues", []) if "museum" in venue.get("type", "").lower()]
+        return venues
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener venues de museo: {str(e)}")
+
+
 @router.post("/tickets/teatro", response_model=TicketResponse)
-def comprar_teatro(request: TeatroTicketRequest) -> TicketResponse:
+async def comprar_teatro(request: TeatroTicketRequest) -> TicketResponse:
     validar_login(request.usuario, request.contrasena)
 
+    # Obtener detalles del evento desde Ticketmaster API
+    try:
+        event_data = await ticketmaster_api.get_event_details(request.event_id)
+        event = TicketmasterEvent(**event_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Evento no encontrado: {str(e)}")
+
     teatro = Teatro(
-        sede=request.sede,
-        obra=request.obra,
-        seccion=request.seccion,
+        event_id=request.event_id,
         boletos=request.boletos,
         fecha=request.fecha,
+        event_data=event,
     )
 
     try:
@@ -84,9 +125,9 @@ def comprar_teatro(request: TeatroTicketRequest) -> TicketResponse:
     TEATRO_ORDENES.append({
         "id": purchase_id,
         "usuario": request.usuario,
-        "sede": request.sede,
-        "obra": request.obra,
-        "seccion": request.seccion,
+        "event_id": request.event_id,
+        "event_name": event.name,
+        "venue": event.venue_name,
         "boletos": request.boletos,
         "fecha": request.fecha.isoformat(),
         "total": total,
@@ -100,15 +141,21 @@ def comprar_teatro(request: TeatroTicketRequest) -> TicketResponse:
 
 
 @router.post("/tickets/cine", response_model=TicketResponse)
-def comprar_cine(request: CineTicketRequest) -> TicketResponse:
+async def comprar_cine(request: CineTicketRequest) -> TicketResponse:
     validar_login(request.usuario, request.contrasena)
 
+    # Obtener detalles del evento desde Ticketmaster API
+    try:
+        event_data = await ticketmaster_api.get_event_details(request.event_id)
+        event = TicketmasterEvent(**event_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Evento no encontrado: {str(e)}")
+
     cine = Cine(
-        establecimiento=request.establecimiento,
-        tipo_servicio=request.tipo_servicio,
-        clasificacion=request.clasificacion,
+        event_id=request.event_id,
         boletos=request.boletos,
         fecha=request.fecha,
+        event_data=event,
     )
 
     try:
@@ -122,9 +169,9 @@ def comprar_cine(request: CineTicketRequest) -> TicketResponse:
     CINE_ORDENES.append({
         "id": purchase_id,
         "usuario": request.usuario,
-        "establecimiento": request.establecimiento,
-        "tipo_servicio": request.tipo_servicio,
-        "clasificacion": request.clasificacion,
+        "event_id": request.event_id,
+        "event_name": event.name,
+        "venue": event.venue_name,
         "boletos": request.boletos,
         "fecha": request.fecha.isoformat(),
         "total": total,
@@ -134,22 +181,22 @@ def comprar_cine(request: CineTicketRequest) -> TicketResponse:
         purchase_id=purchase_id,
         mensaje="Compra de cine registrada correctamente.",
         total=total,
-        detalles={"restricciones": cine.obtener_restricciones()},
     )
 
 
 @router.post("/tickets/museo", response_model=TicketResponse)
-def comprar_museo(request: MuseoTicketRequest) -> TicketResponse:
+async def comprar_museo(request: MuseoTicketRequest) -> TicketResponse:
     validar_login(request.usuario, request.contrasena)
 
-    sede_normalizada = request.sede.strip().upper()
-    ocupacion_actual = MUSEO_OCUPACION.get(sede_normalizada, 0)
+    # Para museos, usamos venue_id directamente (no hay API específica para eventos de museo)
+    # Podríamos buscar el venue, pero por simplicidad, asumimos que el venue_id es válido
+    venue_data = None  # Podríamos implementar búsqueda de venue si es necesario
 
     museo = Museo(
-        sede=request.sede,
+        venue_id=request.venue_id,
         boletos=request.boletos,
         fecha=request.fecha,
-        ocupacion_actual=ocupacion_actual,
+        venue_data=venue_data,
     )
 
     try:
@@ -163,12 +210,11 @@ def comprar_museo(request: MuseoTicketRequest) -> TicketResponse:
     MUSEO_ORDENES.append({
         "id": purchase_id,
         "usuario": request.usuario,
-        "sede": request.sede,
+        "venue_id": request.venue_id,
         "boletos": request.boletos,
         "fecha": request.fecha.isoformat(),
         "total": total,
     })
-    MUSEO_OCUPACION[sede_normalizada] = ocupacion_actual + request.boletos
 
     return TicketResponse(
         purchase_id=purchase_id,

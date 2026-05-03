@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from app.api.endpoints import router
+from app.core.ticketmaster_api import ticketmaster_api
+
+load_dotenv()
 
 app = FastAPI(
     title="TicketMaster Backend",
@@ -18,3 +22,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await ticketmaster_api.close()
