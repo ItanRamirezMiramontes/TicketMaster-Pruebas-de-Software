@@ -84,13 +84,13 @@ class TicketmasterVenue(BaseModel):
     """Modelo para venues de la API de Ticketmaster"""
     id: str
     name: str
-    type: str
-    url: str
-    locale: str
-    timezone: str
-    city: Dict[str, str]
+    type: Optional[str] = None
+    url: Optional[str] = None
+    locale: Optional[str] = None
+    timezone: Optional[str] = None
+    city: Optional[Dict[str, str]] = None
     state: Optional[Dict[str, str]] = None
-    country: Dict[str, str]
+    country: Optional[Dict[str, str]] = None
     address: Optional[Dict[str, str]] = None
     location: Optional[Dict[str, str]] = None
     markets: Optional[List[Dict[str, Any]]] = None

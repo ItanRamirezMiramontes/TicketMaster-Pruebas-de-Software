@@ -23,6 +23,8 @@ const Navbar = ({ activeTab, onNavigate, onLogin, onRegister, onLogout }) => {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
+  const tabs = Object.keys(CATEGORY_DOT).filter(tab => tab !== "Cuenta" || user);
+
   return (
     <nav className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${scrolled ? "bg-slate-950/95 backdrop-blur-xl shadow-lg shadow-black/50" : "bg-gradient-to-b from-black/80 to-transparent"}`}>
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -30,7 +32,7 @@ const Navbar = ({ activeTab, onNavigate, onLogin, onRegister, onLogout }) => {
           <span>🎟</span> TicketMaster
         </button>
         <div className="hidden items-center gap-8 md:flex">
-          {Object.keys(CATEGORY_DOT).map((tab) => (
+          {tabs.map((tab) => (
             <button key={tab} type="button" onClick={() => onNavigate(tab)} className="relative text-sm font-medium text-slate-200 transition hover:text-white" aria-label={`Ir a ${tab}`}>
               {tab}
               {activeTab === tab && <span className={`absolute left-1/2 top-full -translate-x-1/2 mt-2 block h-2 w-2 rounded-full ${CATEGORY_DOT[tab]}`} />}
@@ -65,7 +67,7 @@ const Navbar = ({ activeTab, onNavigate, onLogin, onRegister, onLogout }) => {
       {mobileOpen && (
         <div className="border-t border-white/10 bg-slate-950/95 px-4 py-4 md:hidden">
           <div className="space-y-3">
-            {Object.keys(CATEGORY_DOT).map((tab) => (
+            {tabs.map((tab) => (
               <button key={tab} type="button" onClick={() => { onNavigate(tab); setMobileOpen(false); }} className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm text-slate-200 transition hover:bg-white/5">{tab}{activeTab === tab && <span className={`h-2 w-2 rounded-full ${CATEGORY_DOT[tab]}`} />}</button>
             ))}
           </div>

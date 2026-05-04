@@ -96,7 +96,7 @@ class OrderItem(BaseModel):
     usuario: str
     category: str
     event_name: str
-    venue: str
+    venue: Optional[str] = None
     fecha: str
     total: float
     boletos: int

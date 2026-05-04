@@ -4,6 +4,7 @@ import {
   getFilmsByRegion,
   getFilmShowTimes,
   getTerritories,
+  normalizeFilm,
 } from "../api/movieglu";
 
 const useMovieglu = () => {
@@ -22,7 +23,10 @@ const useMovieglu = () => {
         ? await getFilmsByRegion(territory, 20)
         : await getFilmsNowShowing(20);
       const rawFilms = response.data?.films ?? response.data ?? [];
-      setFilms(Array.isArray(rawFilms) ? rawFilms : []);
+      const normalizedFilms = Array.isArray(rawFilms)
+        ? rawFilms.map(normalizeFilm)
+        : [];
+      setFilms(normalizedFilms);
     } catch (err) {
       setError(
         err?.response?.status === 401

@@ -1,24 +1,4 @@
-import axios from "axios";
-
-const MOVIEGLU_BASE =
-  import.meta.env.VITE_MOVIEGLU_API_URL ?? "https://api-gate2.movieglu.com";
-
-const getApiDate = () => new Date().toISOString().slice(0, 23) + "Z";
-
-const moviegluClient = axios.create({
-  baseURL: MOVIEGLU_BASE,
-  timeout: 12000,
-});
-
-moviegluClient.interceptors.request.use((config) => {
-  if (!config.headers) config.headers = {};
-  config.headers["API-KEY"] = import.meta.env.VITE_MOVIEGLU_API_KEY ?? "";
-  config.headers["client"] = import.meta.env.VITE_MOVIEGLU_CLIENT ?? "";
-  config.headers["x-api-date"] = getApiDate();
-  config.headers["Authorization"] = import.meta.env.VITE_MOVIEGLU_AUTH ?? "";
-  config.headers["Content-Type"] = "application/json";
-  return config;
-});
+import axios from "./axios";
 
 export const normalizeFilm = (film) => ({
   id: String(film.film_id),
@@ -46,24 +26,19 @@ export const normalizeCinema = (cinema) => ({
 });
 
 export const getFilmsNowShowing = (n = 10) =>
-  moviegluClient.get("/filmsNowShowing/", { params: { n } });
+  axios.get(`/movieglu/films?n=${n}`);
 
 export const getFilmShowTimes = (filmId, date, n = 5) =>
-  moviegluClient.get("/filmShowTimes/", {
-    params: { film_id: filmId, date, n },
-  });
+  axios.get(`/movieglu/showtimes?film_id=${filmId}&date=${date}&n=${n}`);
 
-export const getCinemas = (n = 10) =>
-  moviegluClient.get("/cinemas/", { params: { n } });
+export const getCinemas = (n = 10) => axios.get(`/movieglu/cinemas?n=${n}`);
 
 export const getCinemaShowTimes = (cinemaId, date, n = 5) =>
-  moviegluClient.get("/cinemaShowTimes/", {
-    params: { cinema_id: cinemaId, date, n },
-  });
+  axios.get(
+    `/movieglu/cinemaShowTimes?cinema_id=${cinemaId}&date=${date}&n=${n}`,
+  );
 
-export const getTerritories = () => moviegluClient.get("/territories/");
+export const getTerritories = () => axios.get("/movieglu/territories");
 
 export const getFilmsByRegion = (territory, n = 10) =>
-  moviegluClient.get("/filmsNowShowing/", { params: { n, territory } });
-
-export default moviegluClient;
+  axios.get(`/movieglu/films?n=${n}&territory=${territory}`);

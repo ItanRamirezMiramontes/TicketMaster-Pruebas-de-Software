@@ -1,18 +1,5 @@
 import { useEffect, useState } from "react";
-import { getVenueName, getCityName, getImageUrl, getEventPriceLabel, getEventDateLong, formatEventTime } from "../utils/eventHelpers";
-
-const getCategoryColor = (type) => {
-  if (type === "musica") return { badge: "bg-violet-500/20 text-violet-100 border border-violet-500/30" };
-  if (type === "teatro") return { badge: "bg-amber-500/20 text-amber-100 border border-amber-500/30" };
-  if (type === "cine") return { badge: "bg-sky-500/20 text-sky-100 border border-sky-500/30" };
-  return { badge: "bg-emerald-500/20 text-emerald-100 border border-emerald-500/30" };
-};
-const getTypeLabel = (type) => {
-  if (type === "musica") return "Música";
-  if (type === "teatro") return "Teatro";
-  if (type === "cine") return "Cine";
-  return "Museo";
-};
+import { getVenueName, getCityName, getImageUrl, getEventPriceLabel, getEventDateLong, formatEventTime, getCategoryColor, getCategoryLabel } from "../utils/eventHelpers";
 
 const HeroBanner = ({ events, onBuyClick, onCategoryClick }) => {
   const [active, setActive] = useState(0);
@@ -39,7 +26,7 @@ const HeroBanner = ({ events, onBuyClick, onCategoryClick }) => {
       <div className="relative z-10 flex h-[60vh] min-h-[400px] flex-col justify-between p-8 md:p-12">
         <div className="max-w-3xl space-y-4">
           <span className={`inline-flex rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] ${colors.badge}`}>
-            {getTypeLabel(slide.type)} Destacado
+            {getCategoryLabel(slide.type)} Destacado
           </span>
           <h1 className="text-4xl font-bold tracking-tight text-white md:text-6xl">{slide.name}</h1>
           <p className="text-sm uppercase tracking-[0.35em] text-slate-400">{getVenueName(slide)} · {getCityName(slide)}</p>
@@ -50,7 +37,7 @@ const HeroBanner = ({ events, onBuyClick, onCategoryClick }) => {
           <button type="button" onClick={() => onBuyClick(slide, slide.type)} className="inline-flex items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100" aria-label={`Comprar boletos para ${slide.name}`}>
             Comprar Boletos
           </button>
-          <button type="button" onClick={() => onCategoryClick(slide.type)} className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/15" aria-label={`Ver categoría ${getTypeLabel(slide.type)}`}>
+          <button type="button" onClick={() => onCategoryClick(slide.type)} className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/15" aria-label={`Ver categoría ${getCategoryLabel(slide.type)}`}>
             Ver categoría
           </button>
         </div>

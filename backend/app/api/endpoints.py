@@ -1,8 +1,9 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from enum import Enum
 from uuid import uuid4
 from typing import Any, List, Optional
 
+import httpx
 from fastapi import APIRouter, HTTPException
 
 from app.core.security import Security
@@ -20,6 +21,25 @@ from app.schemas.ticket import (
 )
 
 router = APIRouter()
+
+# MovieGlu API Configuration
+MOVIEGLU_BASE = "https://api-gate2.movieglu.com"
+MOVIEGLU_HEADERS_BASE = {
+    "client":        "UDG_0",
+    "x-api-key":     "0zNgLoeaOg62MkDoL5VK4a2Il5QvC3vU3jPZemmS",
+    "Authorization": "Basic VURHXzBfWFg6Sk5BeFY2ZkRDbEht",
+    "territory":     "XX",
+    "api-version":   "v201",
+    "geolocation":   "-22.0;14.0",
+    "Content-Type":  "application/json",
+}
+
+def get_movieglu_headers() -> dict:
+    """Devuelve las cabeceras con device-datetime actualizado"""
+    return {
+        **MOVIEGLU_HEADERS_BASE,
+        "device-datetime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+    }
 
 TEATRO_ORDENES: list[dict] = []
 CINE_ORDENES: list[dict] = []
@@ -461,3 +481,98 @@ async def comprar_museo(request: MuseoTicketRequest) -> TicketResponse:
             asientos=", ".join(request.selected_seats or []),
         ),
     )
+
+
+@router.get("/movieglu/films")
+async def proxy_films_now_showing(n: int = 10):
+    """Proxy para MovieGlu filmsNowShowing"""
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        try:
+            resp = await client.get(
+                f"{MOVIEGLU_BASE}/filmsNowShowing/",
+                headers=get_movieglu_headers(),
+                params={"n": n},
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"MovieGlu error: {e.response.text}",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error conectando con MovieGlu: {str(e)}",
+            )
+
+
+@router.get("/movieglu/showtimes")
+async def proxy_film_showtimes(film_id: int, date: str, n: int = 5):
+    """Proxy para MovieGlu filmShowTimes"""
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        try:
+            resp = await client.get(
+                f"{MOVIEGLU_BASE}/filmShowTimes/",
+                headers=get_movieglu_headers(),
+                params={"film_id": film_id, "date": date, "n": n},
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"MovieGlu error: {e.response.text}",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error conectando con MovieGlu: {str(e)}",
+            )
+
+
+@router.get("/movieglu/cinemas")
+async def proxy_cinemas(n: int = 10):
+    """Proxy para MovieGlu cinemas"""
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        try:
+            resp = await client.get(
+                f"{MOVIEGLU_BASE}/cinemas/",
+                headers=get_movieglu_headers(),
+                params={"n": n},
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"MovieGlu error: {e.response.text}",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error conectando con MovieGlu: {str(e)}",
+            )
+
+
+@router.get("/movieglu/territories")
+async def proxy_territories():
+    """Proxy para MovieGlu territories"""
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        try:
+            resp = await client.get(
+                f"{MOVIEGLU_BASE}/territories/",
+                headers=get_movieglu_headers(),
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"MovieGlu error: {e.response.text}",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error conectando con MovieGlu: {str(e)}",
+            )
