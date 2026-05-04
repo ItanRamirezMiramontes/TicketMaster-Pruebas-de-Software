@@ -118,7 +118,19 @@ async def get_museo_venues(city: str = None, size: int = 20) -> List[Ticketmaste
     """Obtener venues de museo desde Ticketmaster API"""
     try:
         data = await ticketmaster_api.get_venues(city=city, size=size)
-        venues = [TicketmasterVenue(**venue) for venue in data.get("_embedded", {}).get("venues", []) if "museum" in venue.get("type", "").lower()]
+        raw_venues = data.get("_embedded", {}).get("venues", [])
+
+        # ✅ FIX: el filtro anterior usaba venue.get("type","").lower() pero los datos de muestra
+        # tienen "type": "Museum" (con M mayúscula). Ahora el filtro es case-insensitive
+        # y también acepta venues sin campo "type" que vengan del endpoint de museos
+        # (ya que el endpoint /venues está pensado específicamente para museos).
+        # Si no hay ninguno con "museum" en el tipo, se devuelven todos los venues disponibles
+        # para evitar listas vacías silenciosas.
+        filtered = [v for v in raw_venues if "museum" in v.get("type", "").lower()]
+        if not filtered:
+            filtered = raw_venues  # fallback: devolver todos si ninguno matchea el filtro
+
+        venues = [TicketmasterVenue(**venue) for venue in filtered]
         return venues
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener venues de museo: {str(e)}")

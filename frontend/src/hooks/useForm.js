@@ -26,6 +26,7 @@ const useForm = (initialValues = {}) => {
     values,
     errors,
     handleChange,
+    setValues, // ✅ FIX: faltaba esto — todas las páginas lo usan para numero_tarjeta
     setFieldValue,
     setFieldError,
     resetForm,

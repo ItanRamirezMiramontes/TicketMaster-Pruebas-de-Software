@@ -17,19 +17,23 @@ export const AuthProvider = ({ children }) => {
   const login = async ({ usuario, contrasena }) => {
     setError(null);
 
-    if (!USUARIO_PATTERN.test(usuario)) {
+    // ✅ FIX: normalizar a mayúsculas antes de validar y enviar
+    const usuarioUpper = usuario.toUpperCase();
+
+    if (!USUARIO_PATTERN.test(usuarioUpper)) {
       setError("El usuario debe tener entre 5 y 20 caracteres alfanuméricos.");
       return false;
     }
 
     try {
       const response = await api.post("/auth/login", {
-        usuario,
+        usuario: usuarioUpper,
         contrasena,
       });
 
       if (response.status === 200) {
-        setUser({ usuario, contrasena });
+        // ✅ FIX: guardar el usuario en mayúsculas para que los endpoints de compra lo reciban igual
+        setUser({ usuario: usuarioUpper, contrasena });
         return true;
       }
 

@@ -24,7 +24,7 @@ const Register = ({ setAuthMode }) => {
     setLoading(true);
     try {
       const response = await api.post("/auth/register", {
-        usuario: values.usuario,
+        usuario: values.usuario.toUpperCase(), // ✅ FIX: backend exige usuario en MAYÚSCULAS
         contrasena: values.contrasena,
       });
 
@@ -80,7 +80,7 @@ const Register = ({ setAuthMode }) => {
                 onChange={handleChange}
                 placeholder="●●●●●●●●"
                 className="w-full bg-transparent text-slate-100 placeholder:text-slate-500"
-                maxLength={8}
+                maxLength={20} // ✅ FIX: era 8, el backend acepta hasta 20 caracteres
               />
             </div>
           </label>

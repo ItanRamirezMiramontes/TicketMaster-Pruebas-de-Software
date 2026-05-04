@@ -21,7 +21,11 @@ const Login = ({ setAuthMode }) => {
     }
 
     setLoading(true);
-    const success = await login({ usuario: values.usuario, contrasena: values.contrasena });
+    // ✅ FIX: el backend exige usuario en MAYÚSCULAS (validator usuario_mayusculas)
+    const success = await login({
+      usuario: values.usuario.toUpperCase(),
+      contrasena: values.contrasena,
+    });
     setLoading(false);
 
     if (!success && !authError) {
@@ -35,7 +39,7 @@ const Login = ({ setAuthMode }) => {
         <div className="mb-8">
           <p className="text-sm uppercase tracking-[0.4em] text-indigo-400">Acceso Seguro</p>
           <h1 className="mt-4 text-3xl font-semibold text-slate-100">Inicia sesión en TicketMaster</h1>
-          <p className="mt-3 text-slate-400">Ingresa tu usuario de 20 caracteres y contraseña para comenzar a reservar.</p>
+          <p className="mt-3 text-slate-400">Ingresa tu usuario y contraseña para comenzar a reservar.</p>
         </div>
 
         {(localError || authError) && (
@@ -71,7 +75,7 @@ const Login = ({ setAuthMode }) => {
                 onChange={handleChange}
                 placeholder="●●●●●●●●"
                 className="w-full bg-transparent text-slate-100 placeholder:text-slate-500"
-                maxLength={8}
+                maxLength={20} // ✅ FIX: era 8, pero el backend acepta hasta 20 caracteres
               />
             </div>
           </label>

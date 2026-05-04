@@ -84,7 +84,7 @@ class TicketmasterAPI:
     def __init__(self):
         self.api_key = os.getenv("TICKETMASTER_API_KEY")
         self.base_url = os.getenv("TICKETMASTER_BASE_URL", "https://app.ticketmaster.com/discovery/v2/")
-        self.client = httpx.AsyncClient()
+        self.client = httpx.AsyncClient(timeout=10.0)
         self.use_sample_data = not self.api_key or self.api_key == "your_api_key_here"
 
     def _filter_sample_events(self, classification_name: str | None, city: str | None) -> List[Dict[str, Any]]:

@@ -4,7 +4,7 @@ import abc
 import re
 from datetime import date, datetime
 from typing import ClassVar, Dict, Optional, List, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 VENUE_CAPACIDAD_MAP: Dict[str, int] = {
     "scala": 2000,
@@ -35,13 +35,16 @@ class TicketmasterEvent(BaseModel):
     url: str
     dates: Dict[str, Any]
     classifications: List[Dict[str, Any]]
-    _embedded: Optional[Dict[str, Any]] = None
+    embedded: Optional[Dict[str, Any]] = Field(None, alias="_embedded")
     images: List[Dict[str, Any]]
     priceRanges: Optional[List[Dict[str, Any]]] = None
     promoter: Optional[Dict[str, Any]] = None
     info: Optional[str] = None
     pleaseNote: Optional[str] = None
     products: Optional[List[Dict[str, Any]]] = None
+
+    class Config:
+        populate_by_name = True
 
     @property
     def start_date(self) -> Optional[datetime]:
@@ -53,14 +56,14 @@ class TicketmasterEvent(BaseModel):
 
     @property
     def venue_name(self) -> Optional[str]:
-        if self._embedded and "venues" in self._embedded:
-            return self._embedded["venues"][0].get("name")
+        if self.embedded and "venues" in self.embedded:
+            return self.embedded["venues"][0].get("name")
         return None
 
     @property
     def city(self) -> Optional[str]:
-        if self._embedded and "venues" in self._embedded:
-            return self._embedded["venues"][0].get("city", {}).get("name")
+        if self.embedded and "venues" in self.embedded:
+            return self.embedded["venues"][0].get("city", {}).get("name")
         return None
 
     @property
