@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import EventCard from "./EventCard";
 
-const CategoryRow = ({ title, icon: Icon, events, type, onBuyClick, accentColor, onSeeAll }) => {
+const CategoryRow = ({ title, icon: Icon, events, type, onBuyClick, onDetailClick, accentColor, onSeeAll }) => {
   const rowRef = useRef(null);
   const handleScroll = (direction) => {
     rowRef.current?.scrollBy({ left: direction * 320, behavior: "smooth" });
@@ -35,7 +35,15 @@ const CategoryRow = ({ title, icon: Icon, events, type, onBuyClick, accentColor,
             </div>
           </div>
         ) : (
-          events.map((event) => <EventCard key={event.id} event={event} type={type} onBuyClick={onBuyClick} />)
+          events.map((event) => (
+            <EventCard
+              key={event.id}
+              event={event}
+              type={type}
+              onBuyClick={onBuyClick}
+              onDetailClick={onDetailClick}
+            />
+          ))
         )}
       </div>
     </section>

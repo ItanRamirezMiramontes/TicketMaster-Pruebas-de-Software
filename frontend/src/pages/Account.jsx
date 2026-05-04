@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { ShieldCheck, Ticket, Clock3, Wallet } from "lucide-react";
+import { ShieldCheck, Clock3, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useOrders from "../hooks/useOrders";
+import TicketCard from "../components/TicketCard";
 
 const formatDate = (value) => {
   const date = new Date(value);
@@ -114,39 +115,7 @@ const Account = () => {
         ) : (
           <div className="grid gap-5 xl:grid-cols-2">
             {orders.map((order) => (
-              <article key={order.id} className="rounded-[2rem] border border-white/10 bg-slate-950/95 p-6 shadow-2xl shadow-black/30">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.35em] text-slate-500">{order.category.toUpperCase()}</p>
-                    <h3 className="mt-2 text-xl font-semibold text-white">{order.event_name}</h3>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${order.status === "Reservado" ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}>{order.status}</span>
-                </div>
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-3xl bg-slate-900 p-4 text-sm text-slate-300">
-                    <p className="text-slate-400">Fecha</p>
-                    <p className="mt-2 text-white">{formatDate(order.fecha)}</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-900 p-4 text-sm text-slate-300">
-                    <p className="text-slate-400">Boletos</p>
-                    <p className="mt-2 text-white">{order.boletos}</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-900 p-4 text-sm text-slate-300">
-                    <p className="text-slate-400">Total pagado</p>
-                    <p className="mt-2 text-white">${order.total.toFixed(2)} MXN</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-900 p-4 text-sm text-slate-300">
-                    <p className="text-slate-400">Lugar</p>
-                    <p className="mt-2 text-white">{order.venue || "No disponible"}</p>
-                  </div>
-                </div>
-                {order.selected_seats?.length ? (
-                  <div className="mt-5 rounded-3xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
-                    <p className="text-slate-400">Asientos</p>
-                    <p className="mt-2 text-white">{order.selected_seats.join(", ")}</p>
-                  </div>
-                ) : null}
-              </article>
+              <TicketCard key={order.id} order={order} />
             ))}
           </div>
         )}

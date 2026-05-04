@@ -2,38 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, X, Calendar, Ticket } from "lucide-react";
 import api from "../api/axios";
 import SeatSelector from "./SeatSelector";
+import CineSeatSelector from "./CineSeatSelector";
+import { getCategoryLabel, getCityName, getEventPriceLabel, formatEventTime, getImageUrl, getVenueName, getEventDateLong, isHoliday as checkHoliday } from "../utils/eventHelpers";
 
-const getVenueName = (event) => event.embedded?.venues?.[0]?.name ?? event.name ?? "Venue por confirmar";
-const getCityName = (event) => event.embedded?.venues?.[0]?.city?.name ?? event.city?.name ?? "Ciudad por confirmar";
-const getImageUrl = (event, type) => {
-  if (type === "museo") return "https://placehold.co/1200x800?text=Museo";
-  return event.images?.[0]?.url ?? "https://placehold.co/1200x800?text=Evento";
-};
 const getMinPrice = (event) => event.priceRanges?.[0]?.min ?? null;
-const getEventDateLong = (event) => {
-  const raw = event.dates?.start?.dateTime;
-  if (!raw) return "Fecha por confirmar";
-  const d = new Date(raw);
-  return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-};
-const getEventTime = (event) => {
-  const raw = event.dates?.start?.dateTime;
-  if (!raw) return "";
-  return new Date(raw).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
-};
-const isHoliday = (dateString) => {
-  if (!dateString) return false;
-  const date = new Date(dateString);
-  const month = date.getUTCMonth() + 1;
-  const day = date.getUTCDate();
-  return (
-    (month === 1 && day === 1) ||
-    (month === 5 && day === 1) ||
-    (month === 9 && day === 16) ||
-    (month === 11 && day === 20) ||
-    (month === 12 && day === 25)
-  );
-};
 
 const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
   const [method, setMethod] = useState("CREDITO");
@@ -60,7 +32,7 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
 
   useEffect(() => {
     const fetchOccupiedSeats = async () => {
-      if (type === "museo") return; // No seats for museo
+      if (type === "museo") return;
       try {
         const response = await api.get(`/seats/${type}/${event.id}`);
         setOccupiedSeats(response.data);
@@ -71,6 +43,14 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
     };
     fetchOccupiedSeats();
   }, [event.id, type]);
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,11 +63,11 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
       setError("Selecciona una fecha válida.");
       return;
     }
-    if (isHoliday(date)) {
-      setError("No se permiten reservas en días festivos");
+    if (checkHoliday(date)) {
+      setError("No se permiten reservas en días festivos.");
       return;
     }
-    if (selectedSeats.length !== tickets) {
+    if (type !== "museo" && selectedSeats.length !== tickets) {
       setError(`Selecciona ${tickets} asiento${tickets !== 1 ? "s" : ""} antes de continuar.`);
       return;
     }
@@ -117,7 +97,7 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
           nombre_tarjeta: method === "PAYPAL" ? null : cardName,
           numero_tarjeta: method === "PAYPAL" ? null : cardNumber,
         },
-        selected_seats: selectedSeats,
+        selected_seats: type === "museo" ? [] : selectedSeats,
         ...(type === "museo" ? { venue_id: event.id } : { event_id: event.id }),
       };
       const response = await api.post(endpoint, payload);
@@ -131,7 +111,8 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
 
   const title = event.name;
   const subtitle = type === "museo" ? `${getCityName(event)} · ${event.address?.line1 ?? "Dirección por confirmar"}` : `${getVenueName(event)} · ${getCityName(event)}`;
-  const longDate = type === "museo" ? "Entrada flexible" : `${getEventDateLong(event)} · ${getEventTime(event)}`;
+  const longDate = type === "museo" ? "Entrada flexible" : `${getEventDateLong(event)} · ${formatEventTime(event)}`;
+  const categoryLabel = getCategoryLabel(type);
 
   return (
     <div
@@ -151,7 +132,7 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
           <img src={getImageUrl(event, type)} alt={title} className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-6 text-white">
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.35em] text-white/80">{type === "museo" ? "Museo" : type === "musica" ? "Concierto" : type === "teatro" ? "Teatro" : "Cine"}</span>
+            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.35em] text-white/80">{categoryLabel}</span>
             <h2 className="mt-4 text-3xl font-bold">{title}</h2>
             <p className="mt-2 text-sm text-slate-200">{subtitle}</p>
             <p className="mt-1 text-sm text-slate-300">{longDate}</p>
@@ -191,7 +172,18 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
                   </div>
                 </label>
               </div>
-              <SeatSelector eventId={event.id} eventName={event.name} tickets={tickets} selectedSeats={selectedSeats} onSelectedSeatsChange={setSelectedSeats} totalSeats={40} />
+              {type !== "museo" ? (
+                type === "cine" ? (
+                  <CineSeatSelector eventName={event.name} tickets={tickets} selectedSeats={selectedSeats} onSelectedSeatsChange={setSelectedSeats} occupiedSeats={occupiedSeats} />
+                ) : (
+                  <SeatSelector eventId={event.id} eventName={event.name} tickets={tickets} selectedSeats={selectedSeats} onSelectedSeatsChange={setSelectedSeats} totalSeats={40} occupiedSeats={occupiedSeats} />
+                )
+              ) : (
+                <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 text-slate-200">
+                  <p className="text-sm font-semibold text-white">Entrada flexible</p>
+                  <p className="mt-2 text-sm text-slate-400">Este tipo de pase no requiere selección de asiento.</p>
+                </div>
+              )}
               <label className="block text-sm text-slate-300">Método de pago
                 <select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100">
                   <option value="CREDITO">CREDITO</option>
