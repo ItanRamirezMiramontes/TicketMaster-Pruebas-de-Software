@@ -1,23 +1,6 @@
 import { useEffect, useState } from "react";
+import { getVenueName, getCityName, getImageUrl, getEventPriceLabel, getEventDateLong, formatEventTime } from "../utils/eventHelpers";
 
-const getVenueName = (event) => event.embedded?.venues?.[0]?.name ?? "Venue por confirmar";
-const getCityName = (event) => event.embedded?.venues?.[0]?.city?.name ?? "Ciudad por confirmar";
-const getImageUrl = (event, type) => {
-  if (type === "museo") return "https://placehold.co/1200x800?text=Museo";
-  return event.images?.[0]?.url ?? "https://placehold.co/1200x800?text=Evento";
-};
-const getMinPrice = (event) => event.priceRanges?.[0]?.min ?? null;
-const getEventDate = (event) => {
-  const raw = event.dates?.start?.dateTime;
-  if (!raw) return "Fecha por confirmar";
-  const d = new Date(raw);
-  return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-};
-const getEventTime = (event) => {
-  const raw = event.dates?.start?.dateTime;
-  if (!raw) return "";
-  return new Date(raw).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
-};
 const getCategoryColor = (type) => {
   if (type === "musica") return { badge: "bg-violet-500/20 text-violet-100 border border-violet-500/30" };
   if (type === "teatro") return { badge: "bg-amber-500/20 text-amber-100 border border-amber-500/30" };
@@ -43,7 +26,7 @@ const HeroBanner = ({ events, onBuyClick, onCategoryClick }) => {
 
   const slide = events[active];
   const colors = getCategoryColor(slide.type);
-  const price = slide.type === "museo" ? "$220 MXN" : getMinPrice(slide) ? `Desde $${getMinPrice(slide)} MXN` : "Ver precio";
+  const price = getEventPriceLabel(slide, slide.type);
 
   return (
     <div className="relative w-full overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 shadow-2xl shadow-black/40">
@@ -60,7 +43,7 @@ const HeroBanner = ({ events, onBuyClick, onCategoryClick }) => {
           </span>
           <h1 className="text-4xl font-bold tracking-tight text-white md:text-6xl">{slide.name}</h1>
           <p className="text-sm uppercase tracking-[0.35em] text-slate-400">{getVenueName(slide)} · {getCityName(slide)}</p>
-          <p className="max-w-2xl text-base text-slate-200 md:text-lg">{getEventDate(slide)} · {getEventTime(slide)}</p>
+          <p className="max-w-2xl text-base text-slate-200 md:text-lg">{getEventDateLong(slide)} · {formatEventTime(slide)}</p>
           <p className="text-lg font-semibold text-white">{price}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

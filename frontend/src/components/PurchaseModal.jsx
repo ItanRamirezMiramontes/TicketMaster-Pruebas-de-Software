@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, X, Calendar, Ticket } from "lucide-react";
 import api from "../api/axios";
 import SeatSelector from "./SeatSelector";
-import CineSeatSelector from "./CineSeatSelector";
+import CineSeatSelector, { ROOM_TYPES } from "./CineSeatSelector";
 import { getCategoryLabel, getCityName, getEventPriceLabel, formatEventTime, getImageUrl, getVenueName, getEventDateLong, isHoliday as checkHoliday } from "../utils/eventHelpers";
 
 const getMinPrice = (event) => event.priceRanges?.[0]?.min ?? null;
@@ -11,6 +11,7 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
   const [method, setMethod] = useState("CREDITO");
   const [tickets, setTickets] = useState(1);
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [roomType, setRoomType] = useState(type === "cine" ? ROOM_TYPES[0] : null);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -27,8 +28,18 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
   }, [type]);
 
   const price = type === "museo" ? 220 : getMinPrice(event) ?? 220;
-  const subtotal = tickets * price;
+  const priceMultiplier = type === "cine" && roomType ? roomType.priceMultiplier : 1;
+  const subtotal = tickets * price * priceMultiplier;
   const endpoint = type === "museo" ? "/tickets/museo" : `/tickets/${type}`;
+
+  useEffect(() => {
+    if (type === "cine") {
+      setRoomType(ROOM_TYPES[0]);
+    } else {
+      setRoomType(null);
+    }
+    setSelectedSeats([]);
+  }, [type, event.id]);
 
   useEffect(() => {
     const fetchOccupiedSeats = async () => {
@@ -174,7 +185,15 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
               </div>
               {type !== "museo" ? (
                 type === "cine" ? (
-                  <CineSeatSelector eventName={event.name} tickets={tickets} selectedSeats={selectedSeats} onSelectedSeatsChange={setSelectedSeats} occupiedSeats={occupiedSeats} />
+                  <CineSeatSelector
+                    eventId={event.id}
+                    eventName={event.name}
+                    tickets={tickets}
+                    selectedSeats={selectedSeats}
+                    onSelectedSeatsChange={setSelectedSeats}
+                    onRoomTypeChange={setRoomType}
+                    occupiedSeats={occupiedSeats}
+                  />
                 ) : (
                   <SeatSelector eventId={event.id} eventName={event.name} tickets={tickets} selectedSeats={selectedSeats} onSelectedSeatsChange={setSelectedSeats} totalSeats={40} occupiedSeats={occupiedSeats} />
                 )
@@ -205,6 +224,9 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
                 <p className="text-sm uppercase tracking-[0.35em] text-slate-500">Resumen</p>
                 <p className="mt-4 text-lg font-semibold text-white">Subtotal</p>
                 <p className="text-slate-300">${subtotal.toFixed(2)} MXN</p>
+                {type === "cine" && roomType ? (
+                  <p className="mt-2 text-sm text-slate-400">Sala: {roomType.label} · ×{roomType.priceMultiplier}</p>
+                ) : null}
               </div>
               {error && (<p className="rounded-2xl border border-red-600 bg-red-600/10 px-4 py-3 text-sm text-red-200">{error}</p>)}
               <button type="submit" disabled={loading} className="inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed">{loading ? "Procesando..." : "Confirmar compra"}</button>
