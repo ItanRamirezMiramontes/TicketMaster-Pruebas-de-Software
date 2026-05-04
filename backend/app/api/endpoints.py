@@ -1,7 +1,7 @@
 from datetime import date
 from enum import Enum
 from uuid import uuid4
-from typing import List
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, HTTPException
 
@@ -13,8 +13,10 @@ from app.schemas.ticket import (
     LoginRequest,
     MuseoTicketRequest,
     MusicaTicketRequest,
+    OrderItem,
     TeatroTicketRequest,
     TicketResponse,
+    UserProfile,
 )
 
 router = APIRouter()
@@ -24,6 +26,12 @@ CINE_ORDENES: list[dict] = []
 MUSICA_ORDENES: list[dict] = []
 MUSEO_ORDENES: list[dict] = []
 USUARIOS_REGISTRADOS: dict[str, str] = {}  # usuario -> contrasena
+
+# Track occupied seats per event/venue
+OCUPADOS_TEATRO: dict[str, set[str]] = {}  # event_id -> set of occupied seats
+OCUPADOS_CINE: dict[str, set[str]] = {}
+OCUPADOS_MUSICA: dict[str, set[str]] = {}
+OCUPADOS_MUSEO: dict[str, set[str]] = {}  # venue_id -> set of occupied seats
 
 
 def validar_login(usuario: str, contrasena: str) -> None:
@@ -49,14 +57,44 @@ def build_reservation_details(
     restricciones: str,
     lugar: str,
     descripcion: str,
+    asientos: str | None = None,
 ) -> dict[str, str]:
-    return {
+    details = {
         "boletos": boletos,
         "horario_entrada": horario,
         "restricciones": restricciones,
         "lugar": lugar,
         "descripcion": descripcion,
     }
+    if asientos:
+        details["asientos"] = asientos
+    return details
+
+
+def build_status(venta_fecha: str) -> str:
+    try:
+        return "Reservado" if date.fromisoformat(venta_fecha) > date.today() else "Comprado"
+    except Exception:
+        return "Comprado"
+
+
+def get_user_orders(usuario: str) -> list[dict[str, Any]]:
+    ordenes = []
+    for category, order_list in {
+        "teatro": TEATRO_ORDENES,
+        "cine": CINE_ORDENES,
+        "musica": MUSICA_ORDENES,
+        "museo": MUSEO_ORDENES,
+    }.items():
+        for order in order_list:
+            if order["usuario"] == usuario:
+                ordenes.append({
+                    **order,
+                    "category": category,
+                    "status": build_status(order["fecha"]),
+                    "selected_seats": order.get("selected_seats", []),
+                })
+    return ordenes
 
 
 @router.post("/auth/register")
@@ -113,6 +151,16 @@ async def get_musica_events(city: str = None, size: int = 20) -> List[Ticketmast
         raise HTTPException(status_code=500, detail=f"Error al obtener eventos de música: {str(e)}")
 
 
+@router.get("/events/{event_id}")
+async def get_event_details(event_id: str) -> TicketmasterEvent:
+    """Obtener detalles completos de un evento"""
+    try:
+        event_data = await ticketmaster_api.get_event_details(event_id)
+        return TicketmasterEvent(**event_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Evento no encontrado: {str(e)}")
+
+
 @router.get("/venues/museo")
 async def get_museo_venues(city: str = None, size: int = 20) -> List[TicketmasterVenue]:
     """Obtener venues de museo desde Ticketmaster API"""
@@ -122,8 +170,7 @@ async def get_museo_venues(city: str = None, size: int = 20) -> List[Ticketmaste
 
         # ✅ FIX: el filtro anterior usaba venue.get("type","").lower() pero los datos de muestra
         # tienen "type": "Museum" (con M mayúscula). Ahora el filtro es case-insensitive
-        # y también acepta venues sin campo "type" que vengan del endpoint de museos
-        # (ya que el endpoint /venues está pensado específicamente para museos).
+        # y también acepta venues sin campo "type" que vengan del endpoint de museos.
         # Si no hay ninguno con "museum" en el tipo, se devuelven todos los venues disponibles
         # para evitar listas vacías silenciosas.
         filtered = [v for v in raw_venues if "museum" in v.get("type", "").lower()]
@@ -134,6 +181,47 @@ async def get_museo_venues(city: str = None, size: int = 20) -> List[Ticketmaste
         return venues
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener venues de museo: {str(e)}")
+
+
+@router.get("/orders", response_model=List[OrderItem])
+async def get_user_order_history(usuario: str, contrasena: str) -> List[OrderItem]:
+    validar_login(usuario, contrasena)
+    return get_user_orders(usuario)
+
+
+@router.get("/auth/profile", response_model=UserProfile)
+async def get_user_profile(usuario: str, contrasena: str) -> UserProfile:
+    validar_login(usuario, contrasena)
+    orders = get_user_orders(usuario)
+    total_spent = sum(order.get("total", 0.0) for order in orders)
+    total_boletos = sum(order.get("boletos", 0) for order in orders)
+    próximas_reservas = sum(1 for order in orders if order.get("status") == "Reservado")
+    last_purchase = max((order["fecha"] for order in orders), default=None)
+
+    return UserProfile(
+        usuario=usuario,
+        orders_count=len(orders),
+        total_spent=total_spent,
+        total_boletos=total_boletos,
+        próximas_reservas=próximas_reservas,
+        last_purchase=last_purchase,
+    )
+
+
+@router.get("/seats/{event_type}/{event_id}")
+async def get_occupied_seats(event_type: str, event_id: str) -> List[str]:
+    """Obtener asientos ocupados para un evento"""
+    if event_type == "teatro":
+        occupied = OCUPADOS_TEATRO.get(event_id, set())
+    elif event_type == "cine":
+        occupied = OCUPADOS_CINE.get(event_id, set())
+    elif event_type == "musica":
+        occupied = OCUPADOS_MUSICA.get(event_id, set())
+    elif event_type == "museo":
+        occupied = OCUPADOS_MUSEO.get(event_id, set())
+    else:
+        raise HTTPException(status_code=400, detail="Tipo de evento inválido.")
+    return list(occupied)
 
 
 @router.post("/tickets/teatro", response_model=TicketResponse)
@@ -159,6 +247,16 @@ async def comprar_teatro(request: TeatroTicketRequest) -> TicketResponse:
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
+    # Check and occupy seats
+    if request.selected_seats:
+        occupied = OCUPADOS_TEATRO.get(request.event_id, set())
+        for seat in request.selected_seats:
+            if seat in occupied:
+                raise HTTPException(status_code=400, detail=f"Asiento {seat} ya está ocupado.")
+        if request.event_id not in OCUPADOS_TEATRO:
+            OCUPADOS_TEATRO[request.event_id] = set()
+        OCUPADOS_TEATRO[request.event_id].update(request.selected_seats)
+
     total = teatro.calcular_total()
     purchase_id = str(uuid4())
     TEATRO_ORDENES.append({
@@ -170,6 +268,7 @@ async def comprar_teatro(request: TeatroTicketRequest) -> TicketResponse:
         "boletos": request.boletos,
         "fecha": request.fecha.isoformat(),
         "total": total,
+        "selected_seats": request.selected_seats or [],
     })
 
     return TicketResponse(
@@ -182,6 +281,7 @@ async def comprar_teatro(request: TeatroTicketRequest) -> TicketResponse:
             restricciones="No se permite ingresar alimentos o armas. Respeta el horario de entrada.",
             lugar=event.venue_name or "Teatro desconocido",
             descripcion=event.name,
+            asientos=", ".join(request.selected_seats or []),
         ),
     )
 
@@ -209,6 +309,16 @@ async def comprar_cine(request: CineTicketRequest) -> TicketResponse:
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
+    # Check and occupy seats
+    if request.selected_seats:
+        occupied = OCUPADOS_CINE.get(request.event_id, set())
+        for seat in request.selected_seats:
+            if seat in occupied:
+                raise HTTPException(status_code=400, detail=f"Asiento {seat} ya está ocupado.")
+        if request.event_id not in OCUPADOS_CINE:
+            OCUPADOS_CINE[request.event_id] = set()
+        OCUPADOS_CINE[request.event_id].update(request.selected_seats)
+
     total = cine.calcular_total()
     purchase_id = str(uuid4())
     CINE_ORDENES.append({
@@ -220,6 +330,7 @@ async def comprar_cine(request: CineTicketRequest) -> TicketResponse:
         "boletos": request.boletos,
         "fecha": request.fecha.isoformat(),
         "total": total,
+        "selected_seats": request.selected_seats or [],
     })
 
     return TicketResponse(
@@ -232,6 +343,7 @@ async def comprar_cine(request: CineTicketRequest) -> TicketResponse:
             restricciones="Prohibido ingresar mascotas, armas y alimentos externos.",
             lugar=event.venue_name or "Cine desconocido",
             descripcion=event.name,
+            asientos=", ".join(request.selected_seats or []),
         ),
     )
 
@@ -259,6 +371,16 @@ async def comprar_musica(request: MusicaTicketRequest) -> TicketResponse:
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
+    # Check and occupy seats
+    if request.selected_seats:
+        occupied = OCUPADOS_MUSICA.get(request.event_id, set())
+        for seat in request.selected_seats:
+            if seat in occupied:
+                raise HTTPException(status_code=400, detail=f"Asiento {seat} ya está ocupado.")
+        if request.event_id not in OCUPADOS_MUSICA:
+            OCUPADOS_MUSICA[request.event_id] = set()
+        OCUPADOS_MUSICA[request.event_id].update(request.selected_seats)
+
     total = concierto.calcular_total()
     purchase_id = str(uuid4())
     MUSICA_ORDENES.append({
@@ -270,6 +392,7 @@ async def comprar_musica(request: MusicaTicketRequest) -> TicketResponse:
         "boletos": request.boletos,
         "fecha": request.fecha.isoformat(),
         "total": total,
+        "selected_seats": request.selected_seats or [],
     })
 
     return TicketResponse(
@@ -282,6 +405,7 @@ async def comprar_musica(request: MusicaTicketRequest) -> TicketResponse:
             restricciones="Eventos de música con acceso controlado. No se permiten bebidas ni armas.",
             lugar=event.venue_name or "Sala de conciertos desconocida",
             descripcion=event.name,
+            asientos=", ".join(request.selected_seats or []),
         ),
     )
 
@@ -320,6 +444,7 @@ async def comprar_museo(request: MuseoTicketRequest) -> TicketResponse:
         "boletos": request.boletos,
         "fecha": request.fecha.isoformat(),
         "total": total,
+        "selected_seats": request.selected_seats or [],
     })
     MUSEO_OCUPACION[request.venue_id] = MUSEO_OCUPACION.get(request.venue_id, 0) + request.boletos
 
@@ -333,5 +458,6 @@ async def comprar_museo(request: MuseoTicketRequest) -> TicketResponse:
             restricciones=f"Acceso restringido según normas de {venue_data.name}. No se permite comida ni materiales peligrosos.",
             lugar=venue_data.name,
             descripcion=venue_data.city.get("name", "Ciudad desconocida"),
+            asientos=", ".join(request.selected_seats or []),
         ),
     )

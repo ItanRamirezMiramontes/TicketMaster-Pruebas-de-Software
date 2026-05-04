@@ -42,6 +42,7 @@ class TicketmasterEvent(BaseModel):
     info: Optional[str] = None
     pleaseNote: Optional[str] = None
     products: Optional[List[Dict[str, Any]]] = None
+    seatmap: Optional[Dict[str, Any]] = None
 
     class Config:
         populate_by_name = True

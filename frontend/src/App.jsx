@@ -7,6 +7,7 @@ import Teatro from "./pages/Teatro";
 import Cine from "./pages/Cine";
 import Musica from "./pages/Musica";
 import Museo from "./pages/Museo";
+import Account from "./pages/Account";
 import PurchaseModal from "./components/PurchaseModal";
 import { useAuth } from "./context/AuthContext";
 
@@ -42,6 +43,7 @@ function App() {
       case "Cine": return <Cine openModal={openModal} />;
       case "Musica": return <Musica openModal={openModal} />;
       case "Museo": return <Museo openModal={openModal} />;
+      case "Cuenta": return <Account />;
       default: return <Home openModal={openModal} onCategoryClick={(type) => setActiveTab(type === "museo" ? "Museo" : type === "musica" ? "Musica" : type === "teatro" ? "Teatro" : "Cine")} />;
     }
   };

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import api from "../api/axios";
 
 const AuthContext = createContext({
@@ -11,7 +11,14 @@ const AuthContext = createContext({
 const USUARIO_PATTERN = /^[A-Za-z0-9]{5,20}$/;
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("ticketmaster_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [error, setError] = useState(null);
 
   const login = async ({ usuario, contrasena }) => {
@@ -33,7 +40,9 @@ export const AuthProvider = ({ children }) => {
 
       if (response.status === 200) {
         // ✅ FIX: guardar el usuario en mayúsculas para que los endpoints de compra lo reciban igual
-        setUser({ usuario: usuarioUpper, contrasena });
+        const currentUser = { usuario: usuarioUpper, contrasena };
+        setUser(currentUser);
+        localStorage.setItem("ticketmaster_user", JSON.stringify(currentUser));
         return true;
       }
 
@@ -49,6 +58,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setError(null);
+    localStorage.removeItem("ticketmaster_user");
   };
 
   return (

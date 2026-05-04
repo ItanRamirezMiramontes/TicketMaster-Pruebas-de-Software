@@ -25,9 +25,13 @@ const Login = ({ setAuthMode }) => {
     setLoading(true);
     const success = await login({ usuario: values.usuario.toUpperCase(), contrasena: values.contrasena });
     setLoading(false);
-    if (!success && !authError) {
-      setLocalError("No se pudo iniciar sesión. Verifica tus datos.");
+    if (!success) {
+      if (!authError) {
+        setLocalError("No se pudo iniciar sesión. Verifica tus datos.");
+      }
+      return;
     }
+    setAuthMode(null);
   };
 
   return (

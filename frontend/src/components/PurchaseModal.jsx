@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, X, Calendar, Ticket } from "lucide-react";
 import api from "../api/axios";
+import SeatSelector from "./SeatSelector";
 
 const getVenueName = (event) => event.embedded?.venues?.[0]?.name ?? event.name ?? "Venue por confirmar";
 const getCityName = (event) => event.embedded?.venues?.[0]?.city?.name ?? event.city?.name ?? "Ciudad por confirmar";
@@ -37,12 +38,14 @@ const isHoliday = (dateString) => {
 const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
   const [method, setMethod] = useState("CREDITO");
   const [tickets, setTickets] = useState(1);
+  const [selectedSeats, setSelectedSeats] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [occupiedSeats, setOccupiedSeats] = useState([]);
 
   const maxTickets = useMemo(() => {
     if (type === "cine") return 10;
@@ -56,10 +59,18 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
   const endpoint = type === "museo" ? "/tickets/museo" : `/tickets/${type}`;
 
   useEffect(() => {
-    const onKeyDown = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+    const fetchOccupiedSeats = async () => {
+      if (type === "museo") return; // No seats for museo
+      try {
+        const response = await api.get(`/seats/${type}/${event.id}`);
+        setOccupiedSeats(response.data);
+      } catch (err) {
+        console.error("Error fetching occupied seats:", err);
+        setOccupiedSeats([]);
+      }
+    };
+    fetchOccupiedSeats();
+  }, [event.id, type]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -74,6 +85,10 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
     }
     if (isHoliday(date)) {
       setError("No se permiten reservas en días festivos");
+      return;
+    }
+    if (selectedSeats.length !== tickets) {
+      setError(`Selecciona ${tickets} asiento${tickets !== 1 ? "s" : ""} antes de continuar.`);
       return;
     }
     if (method !== "PAYPAL") {
@@ -102,6 +117,7 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
           nombre_tarjeta: method === "PAYPAL" ? null : cardName,
           numero_tarjeta: method === "PAYPAL" ? null : cardNumber,
         },
+        selected_seats: selectedSeats,
         ...(type === "museo" ? { venue_id: event.id } : { event_id: event.id }),
       };
       const response = await api.post(endpoint, payload);
@@ -118,8 +134,16 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
   const longDate = type === "museo" ? "Entrada flexible" : `${getEventDateLong(event)} · ${getEventTime(event)}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] bg-slate-900 shadow-2xl shadow-black/50">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-2xl max-h-[calc(100vh-4rem)] overflow-y-auto rounded-[2rem] bg-slate-900 shadow-2xl shadow-black/50"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button type="button" onClick={onClose} aria-label="Cerrar modal" className="absolute right-4 top-4 rounded-full bg-slate-950/80 p-2 text-slate-200 transition hover:bg-slate-900">
           <X className="h-4 w-4" />
         </button>
@@ -156,7 +180,7 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className="block text-sm text-slate-300">Boletos
-                  <select value={tickets} onChange={(e) => setTickets(Number(e.target.value))} className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100">
+                  <select value={tickets} onChange={(e) => { setTickets(Number(e.target.value)); setSelectedSeats([]); }} className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100">
                     {Array.from({ length: maxTickets }, (_, index) => index + 1).map((value) => (<option key={value} value={value}>{value}</option>))}
                   </select>
                 </label>
@@ -167,6 +191,7 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
                   </div>
                 </label>
               </div>
+              <SeatSelector eventId={event.id} eventName={event.name} tickets={tickets} selectedSeats={selectedSeats} onSelectedSeatsChange={setSelectedSeats} totalSeats={40} />
               <label className="block text-sm text-slate-300">Método de pago
                 <select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100">
                   <option value="CREDITO">CREDITO</option>

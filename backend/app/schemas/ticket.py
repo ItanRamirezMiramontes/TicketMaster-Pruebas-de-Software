@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import date
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator, validator
 
@@ -41,12 +41,23 @@ class BaseTicketRequest(BaseModel):
     contrasena: str
     fecha: date
     pago: PaymentInfo
+    selected_seats: Optional[List[str]] = None
 
     @validator("usuario")
     def usuario_mayusculas(cls, v: str) -> str:
         if v != v.upper():
             raise ValueError("El usuario debe estar en mayúsculas.")
         return v
+
+    @validator("selected_seats", each_item=True)
+    def validar_asientos(cls, seat: str) -> str:
+        if seat is None:
+            return seat
+        if not isinstance(seat, str) or not seat.strip():
+            raise ValueError("Cada asiento debe ser una cadena válida.")
+        if not seat.strip().isalnum():
+            raise ValueError("El identificador de asiento solo puede contener letras y números.")
+        return seat.strip().upper()
 
 
 class LoginRequest(BaseModel):
@@ -78,6 +89,28 @@ class MusicaTicketRequest(BaseTicketRequest):
 class MuseoTicketRequest(BaseTicketRequest):
     venue_id: str
     boletos: int = Field(..., ge=1)
+
+
+class OrderItem(BaseModel):
+    id: str
+    usuario: str
+    category: str
+    event_name: str
+    venue: str
+    fecha: str
+    total: float
+    boletos: int
+    status: str
+    selected_seats: Optional[List[str]] = None
+
+
+class UserProfile(BaseModel):
+    usuario: str
+    orders_count: int
+    total_spent: float
+    total_boletos: int
+    próximas_reservas: int
+    last_purchase: Optional[str] = None
 
 
 class TicketResponse(BaseModel):

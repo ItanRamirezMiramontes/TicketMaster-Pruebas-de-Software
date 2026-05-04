@@ -8,6 +8,7 @@ const CATEGORY_DOT = {
   Cine: "bg-sky-400",
   Musica: "bg-violet-400",
   Museo: "bg-emerald-400",
+  Cuenta: "bg-indigo-400",
 };
 
 const Navbar = ({ activeTab, onNavigate, onLogin, onRegister, onLogout }) => {
