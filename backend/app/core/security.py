@@ -2,7 +2,9 @@ import re
 
 
 class Security:
-    USUARIO_PATTERN = re.compile(r'^[A-Za-z0-9]{5,20}$')
+    USUARIO_PATTERN = re.compile(
+        r'^(?:[A-Z]{4}[0-9]{6}[A-Z]{3}[A-Z0-9]{3}[A-Z]{2}[0-9]|[A-Z0-9]{5,20})$'
+    )
     PASSWORD_PATTERN = re.compile(r'^.{8,20}$')
 
     @staticmethod

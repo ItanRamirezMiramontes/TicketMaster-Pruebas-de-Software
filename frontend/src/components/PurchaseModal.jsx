@@ -3,7 +3,7 @@ import { CheckCircle2, X, Calendar, Ticket } from "lucide-react";
 import api from "../api/axios";
 import SeatSelector from "./SeatSelector";
 import CineSeatSelector, { ROOM_TYPES } from "./CineSeatSelector";
-import { getCategoryLabel, getCityName, getEventPriceLabel, formatEventTime, getImageUrl, getVenueName, getEventDateLong, isHoliday as checkHoliday } from "../utils/eventHelpers";
+import { getCategoryLabel, getCityName, getEventPriceLabel, formatEventTime, getImageUrl, getVenueName, getEventDateLong, isHoliday as checkHoliday, getCineForEvent, getClasificacionForEvent, RESTRICCIONES_POR_TIPO, HORARIOS_POR_TIPO, MAX_TICKETS, DEFAULT_PRICE } from "../utils/eventHelpers";
 
 const getMinPrice = (event) => event.priceRanges?.[0]?.min ?? null;
 
@@ -20,14 +20,10 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
   const [result, setResult] = useState(null);
   const [occupiedSeats, setOccupiedSeats] = useState([]);
 
-  const maxTickets = useMemo(() => {
-    if (type === "cine") return 10;
-    if (type === "teatro") return 10;
-    if (type === "musica") return 12;
-    return 5;
-  }, [type]);
+  const maxTickets = MAX_TICKETS[type] ?? 10;
 
-  const price = type === "museo" ? 220 : getMinPrice(event) ?? 220;
+  const basePrice = DEFAULT_PRICE[type] ?? 500;
+  const price = type === "museo" ? basePrice : getMinPrice(event) ?? basePrice;
   const priceMultiplier = type === "cine" && roomType ? roomType.priceMultiplier : 1;
   const subtotal = tickets * price * priceMultiplier;
   const endpoint = type === "museo" ? "/tickets/museo" : `/tickets/${type}`;
@@ -125,6 +121,9 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
   const longDate = type === "museo" ? "Entrada flexible" : `${getEventDateLong(event)} · ${formatEventTime(event)}`;
   const categoryLabel = getCategoryLabel(type);
 
+  const cineInfo = type === "cine" ? getCineForEvent(event.id) : null;
+  const clasificacion = type === "cine" ? getClasificacionForEvent(event.id) : null;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"
@@ -170,19 +169,58 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
             </div>
           ) : (
             <form className="space-y-6" onSubmit={handleSubmit}>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <label className="block text-sm text-slate-300">Boletos
+              {/* ── SECCIÓN 1: Información del evento (read-only) ────── */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="flex items-center gap-4">
+                  <img src={getImageUrl(event, type)} alt={event.name}
+                    className="h-16 w-12 rounded-xl object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate font-semibold text-white">{event.name}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {type === "museo"
+                        ? `📍 ${getCityName(event)}`
+                        : `📍 ${getVenueName(event)} · ${getCityName(event)}`}
+                    </p>
+                    {type === "cine" && cineInfo && (
+                      <p className="mt-1 text-xs text-sky-300">
+                        🎬 {cineInfo.name} · Clasificación: {clasificacion}
+                      </p>
+                    )}
+                    {type === "teatro" && (
+                      <p className="mt-1 text-xs text-amber-300">
+                        👔 Vestimenta: Formal / Semi-formal
+                      </p>
+                    )}
+                    {type === "museo" && (
+                      <p className="mt-1 text-xs text-emerald-300">
+                        🕐 {HORARIOS_POR_TIPO.museo}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3 rounded-xl bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
+                  ⚠ {RESTRICCIONES_POR_TIPO[type]}
+                </div>
+              </div>
+
+              {/* ── SECCIÓN 2: Boletos y fecha ──────────────────────── */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm text-slate-300">
+                  Boletos
                   <select value={tickets} onChange={(e) => { setTickets(Number(e.target.value)); setSelectedSeats([]); }} className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100">
                     {Array.from({ length: maxTickets }, (_, index) => index + 1).map((value) => (<option key={value} value={value}>{value}</option>))}
                   </select>
                 </label>
-                <label className="block text-sm text-slate-300">Fecha
+                <label className="block text-sm text-slate-300">
+                  Fecha
                   <div className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
                     <Calendar className="h-4 w-4 text-slate-400" />
                     <input type="date" min={new Date().toISOString().slice(0, 10)} value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-transparent text-slate-100" />
                   </div>
                 </label>
               </div>
+
+              {/* ── SECCIÓN 3: Selector de asientos ────────────────── */}
               {type !== "museo" ? (
                 type === "cine" ? (
                   <CineSeatSelector
@@ -203,30 +241,63 @@ const PurchaseModal = ({ event, type, user, onClose, onSuccess }) => {
                   <p className="mt-2 text-sm text-slate-400">Este tipo de pase no requiere selección de asiento.</p>
                 </div>
               )}
-              <label className="block text-sm text-slate-300">Método de pago
+
+              {/* ── SECCIÓN 4: Método de pago ───────────────────────── */}
+              <label className="block text-sm text-slate-300">
+                Método de pago
                 <select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100">
                   <option value="CREDITO">CREDITO</option>
                   <option value="DEBITO">DEBITO</option>
                   <option value="PAYPAL">PAYPAL</option>
                 </select>
               </label>
-              {method !== "PAYPAL" ? (
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <label className="block text-sm text-slate-300">Nombre en la tarjeta
+              {method !== "PAYPAL" && (
+                <div className="space-y-4">
+                  <label className="block text-sm text-slate-300">
+                    Nombre del titular
                     <input value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Nombre completo" className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100" />
                   </label>
-                  <label className="block text-sm text-slate-300">Número de tarjeta
+                  <label className="block text-sm text-slate-300">
+                    Número de tarjeta
                     <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, ""))} placeholder="0000000000000000" className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100" />
                   </label>
                 </div>
-              ) : null}
-              <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5">
-                <p className="text-sm uppercase tracking-[0.35em] text-slate-500">Resumen</p>
-                <p className="mt-4 text-lg font-semibold text-white">Subtotal</p>
-                <p className="text-slate-300">${subtotal.toFixed(2)} MXN</p>
-                {type === "cine" && roomType ? (
-                  <p className="mt-2 text-sm text-slate-400">Sala: {roomType.label} · ×{roomType.priceMultiplier}</p>
-                ) : null}
+              )}
+
+              {/* ── SECCIÓN 5: Resumen de compra ───────────────────── */}
+              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500 mb-3">
+                  Resumen
+                </p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">{tickets} boleto{tickets>1?"s":""}</span>
+                    <span className="text-white">${basePrice} MXN c/u</span>
+                  </div>
+                  {type === "cine" && roomType && roomType.priceMultiplier !== 1 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Sala {roomType.icon} {roomType.label}</span>
+                      <span className="text-white">×{roomType.priceMultiplier}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-white/10 pt-2 font-semibold">
+                    <span className="text-white">Total</span>
+                    <span className="text-white text-lg">${subtotal.toFixed(2)} MXN</span>
+                  </div>
+                </div>
+                {selectedSeats.length > 0 && (
+                  <div className="mt-3 border-t border-white/10 pt-3">
+                    <p className="text-xs text-slate-500 mb-2">Asientos:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedSeats.map((s) => (
+                        <span key={s}
+                          className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-200">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               {error && (<p className="rounded-2xl border border-red-600 bg-red-600/10 px-4 py-3 text-sm text-red-200">{error}</p>)}
               <button type="submit" disabled={loading} className="inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed">{loading ? "Procesando..." : "Confirmar compra"}</button>

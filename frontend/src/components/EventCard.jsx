@@ -1,5 +1,5 @@
 import { ArrowRight } from "lucide-react";
-import { getCategoryColor, getEventPriceLabel, getImageUrl, getVenueName, getCityName, formatDateShort, formatEventTime, getCategoryLabel } from "../utils/eventHelpers";
+import { getCategoryColor, getEventPriceLabel, getImageUrl, getVenueName, getCityName, formatDateShort, formatEventTime, getCategoryLabel, getCineForEvent } from "../utils/eventHelpers";
 
 const EventCard = ({ event, type, onBuyClick, onDetailClick }) => {
   const imageUrl = getImageUrl(event, type, "600x800");
@@ -33,6 +33,19 @@ const EventCard = ({ event, type, onBuyClick, onDetailClick }) => {
         <span className={`absolute left-3 top-3 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${colors.badge}`}>
           {typeLabel}
         </span>
+        {event._source === "movieglu" && (
+          <span className="absolute top-2 left-2 z-10 rounded-full
+            bg-emerald-500/20 border border-emerald-500/30
+            px-2 py-0.5 text-[9px] uppercase tracking-wider text-emerald-300">
+            MovieGlu
+          </span>
+        )}
+        {type === "cine" && (
+          <span className="absolute top-2 right-2 z-10 rounded-full
+            bg-black/60 px-2 py-0.5 text-[9px] text-slate-300">
+            {getCineForEvent(event.id)?.name ?? "Cine"}
+          </span>
+        )}
         <div className="absolute inset-x-0 bottom-0 p-4 opacity-100">
           <p className="text-sm font-semibold text-slate-100 line-clamp-2">{title}</p>
           <p className="mt-2 text-[11px] text-slate-400">{subtitle}</p>
@@ -42,18 +55,17 @@ const EventCard = ({ event, type, onBuyClick, onDetailClick }) => {
           </div>
           <p className="mt-3 text-sm font-semibold text-slate-100">{price}</p>
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onBuyClick?.(event, type);
-          }}
-          aria-label={`Comprar boletos para ${title}`}
-          className="absolute inset-x-0 top-1/2 mx-4 flex h-11 items-center justify-center rounded-2xl bg-black/70 text-sm font-semibold text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        >
-          Comprar
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </button>
+        <div className="absolute inset-0 flex flex-col items-center
+          justify-center gap-2 bg-black/60 opacity-0
+          transition-opacity group-hover:opacity-100">
+          <button type="button"
+            onClick={(e) => { e.stopPropagation(); onBuyClick?.(event, type); }}
+            className="rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold
+              text-white transition hover:bg-indigo-500">
+            Comprar
+          </button>
+          <span className="text-xs text-slate-300">Ver info →</span>
+        </div>
       </div>
     </div>
   );

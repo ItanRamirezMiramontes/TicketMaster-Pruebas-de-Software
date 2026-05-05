@@ -133,7 +133,14 @@ const CineSeatSelector = ({ eventId, eventName, tickets, selectedSeats, onSelect
             <h3 className="text-lg font-semibold text-white">Selecciona tus asientos</h3>
             <p className="mt-2 text-sm text-slate-400">Sala de cine para {eventName}. Selecciona hasta {tickets} asiento{tickets !== 1 ? "s" : ""}.</p>
           </div>
-          <div className="rounded-2xl bg-slate-900 px-4 py-2 text-sm text-slate-200">Seleccionados: {selectedSeats.length}/{tickets}</div>
+          <div className={`rounded-2xl px-4 py-2 text-sm font-semibold transition
+            ${selectedSeats.length === tickets
+              ? "bg-emerald-500/20 text-emerald-200 border border-emerald-500/30"
+              : "bg-slate-900 text-slate-200"}`}>
+            {selectedSeats.length === tickets
+              ? `✓ ${selectedSeats.length}/${tickets} seleccionados`
+              : `${selectedSeats.length}/${tickets} seleccionados`}
+          </div>
         </div>
         <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-2">
           {ROOM_TYPES.map((option, index) => {
@@ -171,6 +178,17 @@ const CineSeatSelector = ({ eventId, eventName, tickets, selectedSeats, onSelect
       <div className="text-center text-xs uppercase tracking-[0.35em] text-slate-500">PANTALLA</div>
 
       <div className="mt-4 rounded-3xl bg-slate-900 p-4">
+        <div className="flex items-center gap-1 mb-1">
+          <span className="w-6" />
+          <div className="grid w-full gap-2"
+            style={{ gridTemplateColumns: `repeat(${room.cols}, minmax(0, 1fr))` }}>
+            {Array.from({ length: room.cols }, (_, i) => (
+              <span key={i} className="text-center text-[9px] text-slate-600 font-medium">
+                {i + 1}
+              </span>
+            ))}
+          </div>
+        </div>
         {rows.map((row) => (
           <div key={row.letter} className="mb-3 flex items-center gap-3 last:mb-0">
             <span className="w-6 text-right text-xs font-semibold uppercase text-slate-500">{row.letter}</span>
@@ -187,7 +205,11 @@ const CineSeatSelector = ({ eventId, eventName, tickets, selectedSeats, onSelect
                         ? "border-slate-700 bg-slate-950 text-slate-100 hover:border-sky-400 hover:bg-slate-800"
                         : "cursor-not-allowed border-slate-700 bg-slate-800 text-slate-500"
                     } ${selected ? room.selectedClass : ""}`}
-                    title={seat.available ? `Asiento ${seat.id}` : "No disponible"}
+                    title={seat.available
+                      ? selectedSeats.includes(seat.id)
+                        ? `Quitar asiento ${seat.id}`
+                        : `Seleccionar asiento ${seat.id}`
+                      : `Asiento ${seat.id} — No disponible`}
                   >
                     {seat.id.slice(1)}
                   </button>
@@ -198,27 +220,36 @@ const CineSeatSelector = ({ eventId, eventName, tickets, selectedSeats, onSelect
         ))}
       </div>
 
+      {selectedSeats.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-500 mb-3">
+            Asientos seleccionados
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {selectedSeats.map((seat) => (
+              <button
+                key={seat}
+                type="button"
+                onClick={() => onSelectedSeatsChange(selectedSeats.filter((s) => s !== seat))}
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1
+                  text-xs font-semibold transition hover:opacity-80 ${room.accentClass}`}
+                title={`Quitar asiento ${seat}`}
+              >
+                {seat} <span className="text-[10px] opacity-70">✕</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Haz clic en un asiento seleccionado para quitarlo.
+          </p>
+        </div>
+      )}
+
       <div className="mt-4 grid gap-3 sm:grid-cols-3 text-sm text-slate-400">
         <p><span className="font-semibold text-white">Disponible</span> para seleccionar.</p>
         <p><span className="font-semibold text-white">Ocupado</span> no puede usarse.</p>
         <p><span className="font-semibold text-white">Seleccionado</span> refleja su compra.</p>
       </div>
-
-      {selectedSeats.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
-          <span className="font-semibold text-white">Asientos:</span>
-          {selectedSeats.map((seat) => (
-            <button
-              key={seat}
-              type="button"
-              onClick={() => onSelectedSeatsChange(selectedSeats.filter((item) => item !== seat))}
-              className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 transition hover:border-red-500"
-            >
-              {seat} ×
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
