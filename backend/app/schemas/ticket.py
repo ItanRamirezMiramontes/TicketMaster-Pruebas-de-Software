@@ -42,11 +42,21 @@ class BaseTicketRequest(BaseModel):
     fecha: date
     pago: PaymentInfo
     selected_seats: Optional[List[str]] = None
+    telefono: Optional[str] = None
 
     @validator("usuario")
     def usuario_mayusculas(cls, v: str) -> str:
         if v != v.upper():
             raise ValueError("El usuario debe estar en mayúsculas.")
+        return v
+
+    @validator("telefono")
+    def validar_telefono(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        cleaned = re.sub(r"[^\d+]", "", v)
+        if not cleaned or not re.search(r"\d", cleaned):
+            raise ValueError("El teléfono debe contener dígitos válidos.")
         return v
 
     @validator("selected_seats", each_item=True)

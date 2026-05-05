@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.security import Security
 from app.core.ticketmaster_api import ticketmaster_api
+from app.core.whatsapp_service import enviar_whatsapp
 from app.models.events import Cine, Concierto, Museo, Pago, Teatro, TicketmasterEvent, TicketmasterVenue, MUSEO_OCUPACION
 from app.schemas.ticket import (
     CineTicketRequest,
@@ -33,6 +34,70 @@ MOVIEGLU_HEADERS_BASE = {
     "geolocation":   "-22.0;14.0",
     "Content-Type":  "application/json",
 }
+
+MOVIEGLU_SAMPLE_FILMS = {
+    "films": [
+        {
+            "film_id": 1001,
+            "film_name": "Gran Estreno Local",
+            "film_trailer": "",
+            "images": {"still_url": "https://placehold.co/600x400?text=Gran+Estreno+Local"},
+            "showings": [
+                {
+                    "cinema_id": 2001,
+                    "cinema_name": "Cine Central",
+                    "date_time": "2026-06-20T20:00:00Z",
+                    "territory": "XX",
+                }
+            ],
+        },
+        {
+            "film_id": 1002,
+            "film_name": "Comedia de Verano",
+            "film_trailer": "",
+            "images": {"still_url": "https://placehold.co/600x400?text=Comedia+de+Verano"},
+            "showings": [
+                {
+                    "cinema_id": 2002,
+                    "cinema_name": "Cine Plaza",
+                    "date_time": "2026-06-22T18:30:00Z",
+                    "territory": "XX",
+                }
+            ],
+        },
+    ]
+}
+
+MOVIEGLU_SAMPLE_CINEMAS = [
+    {
+        "cinema_id": 2001,
+        "cinema_name": "Cine Central",
+        "address": {"address1": "Av. Principal 123", "city": "Ciudad Capital", "state": "Estado", "postcode": "12345"},
+        "images": {"logo_url": "https://placehold.co/200x100?text=Cine+Central"},
+        "distance": 1.2,
+    },
+    {
+        "cinema_id": 2002,
+        "cinema_name": "Cine Plaza",
+        "address": {"address1": "Calle Secundaria 45", "city": "Costa del Sol", "state": "Estado", "postcode": "67890"},
+        "images": {"logo_url": "https://placehold.co/200x100?text=Cine+Plaza"},
+        "distance": 3.4,
+    },
+]
+
+MOVIEGLU_SAMPLE_SHOWTIMES = {
+    "showings": [
+        {
+            "cinema_id": 2001,
+            "cinema_name": "Cine Central",
+            "show_time": "2026-06-20T20:00:00Z",
+            "language": "Español",
+            "screen_type": "Standard",
+        }
+    ]
+}
+
+MOVIEGLU_SAMPLE_TERRITORIES = {"territories": [{"code": "XX", "name": "Global"}]}
 
 def get_movieglu_headers() -> dict:
     """Devuelve las cabeceras con device-datetime actualizado"""
@@ -291,6 +356,18 @@ async def comprar_teatro(request: TeatroTicketRequest) -> TicketResponse:
         "selected_seats": request.selected_seats or [],
     })
 
+    enviar_whatsapp(
+        telefono=request.telefono,
+        nombre=request.pago.nombre_tarjeta or request.usuario,
+        tipo_evento="Teatro",
+        ubicacion=event.venue_name or "Teatro desconocido",
+        fecha=request.fecha.isoformat(),
+        cantidad=request.boletos,
+        metodo_pago=request.pago.metodo.value,
+        total=total,
+        codigo_confirmacion=purchase_id,
+    )
+
     return TicketResponse(
         purchase_id=purchase_id,
         mensaje="Compra de teatro registrada correctamente.",
@@ -352,6 +429,18 @@ async def comprar_cine(request: CineTicketRequest) -> TicketResponse:
         "total": total,
         "selected_seats": request.selected_seats or [],
     })
+
+    enviar_whatsapp(
+        telefono=request.telefono,
+        nombre=request.pago.nombre_tarjeta or request.usuario,
+        tipo_evento="Cine",
+        ubicacion=event.venue_name or "Cine desconocido",
+        fecha=request.fecha.isoformat(),
+        cantidad=request.boletos,
+        metodo_pago=request.pago.metodo.value,
+        total=total,
+        codigo_confirmacion=purchase_id,
+    )
 
     return TicketResponse(
         purchase_id=purchase_id,
@@ -415,6 +504,18 @@ async def comprar_musica(request: MusicaTicketRequest) -> TicketResponse:
         "selected_seats": request.selected_seats or [],
     })
 
+    enviar_whatsapp(
+        telefono=request.telefono,
+        nombre=request.pago.nombre_tarjeta or request.usuario,
+        tipo_evento="Música",
+        ubicacion=event.venue_name or "Sala de conciertos desconocida",
+        fecha=request.fecha.isoformat(),
+        cantidad=request.boletos,
+        metodo_pago=request.pago.metodo.value,
+        total=total,
+        codigo_confirmacion=purchase_id,
+    )
+
     return TicketResponse(
         purchase_id=purchase_id,
         mensaje="Compra de música registrada correctamente.",
@@ -468,6 +569,18 @@ async def comprar_museo(request: MuseoTicketRequest) -> TicketResponse:
     })
     MUSEO_OCUPACION[request.venue_id] = MUSEO_OCUPACION.get(request.venue_id, 0) + request.boletos
 
+    enviar_whatsapp(
+        telefono=request.telefono,
+        nombre=request.pago.nombre_tarjeta or request.usuario,
+        tipo_evento="Museo",
+        ubicacion=venue_data.name,
+        fecha=request.fecha.isoformat(),
+        cantidad=request.boletos,
+        metodo_pago=request.pago.metodo.value,
+        total=total,
+        codigo_confirmacion=purchase_id,
+    )
+
     return TicketResponse(
         purchase_id=purchase_id,
         mensaje="Compra de museo registrada correctamente.",
@@ -484,27 +597,24 @@ async def comprar_museo(request: MuseoTicketRequest) -> TicketResponse:
 
 
 @router.get("/movieglu/films")
-async def proxy_films_now_showing(n: int = 10):
+async def proxy_films_now_showing(n: int = 10, territory: str | None = None):
     """Proxy para MovieGlu filmsNowShowing"""
     async with httpx.AsyncClient(timeout=12.0) as client:
         try:
+            params = {"n": n}
+            if territory:
+                params["territory"] = territory
             resp = await client.get(
                 f"{MOVIEGLU_BASE}/filmsNowShowing/",
                 headers=get_movieglu_headers(),
-                params={"n": n},
+                params=params,
             )
             resp.raise_for_status()
             return resp.json()
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"MovieGlu error: {e.response.text}",
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Error conectando con MovieGlu: {str(e)}",
-            )
+        except httpx.HTTPError:
+            return MOVIEGLU_SAMPLE_FILMS
+        except Exception:
+            return MOVIEGLU_SAMPLE_FILMS
 
 
 @router.get("/movieglu/showtimes")
@@ -519,16 +629,10 @@ async def proxy_film_showtimes(film_id: int, date: str, n: int = 5):
             )
             resp.raise_for_status()
             return resp.json()
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"MovieGlu error: {e.response.text}",
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Error conectando con MovieGlu: {str(e)}",
-            )
+        except httpx.HTTPError:
+            return MOVIEGLU_SAMPLE_SHOWTIMES
+        except Exception:
+            return MOVIEGLU_SAMPLE_SHOWTIMES
 
 
 @router.get("/movieglu/cinemas")
@@ -543,16 +647,10 @@ async def proxy_cinemas(n: int = 10):
             )
             resp.raise_for_status()
             return resp.json()
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"MovieGlu error: {e.response.text}",
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Error conectando con MovieGlu: {str(e)}",
-            )
+        except httpx.HTTPError:
+            return MOVIEGLU_SAMPLE_CINEMAS
+        except Exception:
+            return MOVIEGLU_SAMPLE_CINEMAS
 
 
 @router.get("/movieglu/territories")
@@ -566,13 +664,7 @@ async def proxy_territories():
             )
             resp.raise_for_status()
             return resp.json()
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"MovieGlu error: {e.response.text}",
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Error conectando con MovieGlu: {str(e)}",
-            )
+        except httpx.HTTPError:
+            return MOVIEGLU_SAMPLE_TERRITORIES
+        except Exception:
+            return MOVIEGLU_SAMPLE_TERRITORIES
